@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Activity, Plus, Pencil, Trash2, X, Tag, Package, List, Save, Lock, LayoutDashboard } from "lucide-react";
+import { Activity, Plus, Pencil, Trash2, X, Tag, Package, List, Save, Lock, LayoutDashboard, Search, Bell, MessageSquare, Settings, LogOut, ChevronRight, Users, BarChart, FileText, MoreVertical, CalendarDays, Globe2, ShoppingBag, ShoppingCart, ReceiptText, PackageSearch } from "lucide-react";
 import {
   useApiCategories,
   useApiProducts,
@@ -16,33 +16,44 @@ import {
   newId,
   slugify,
   categoryName,
+  seedCategories,
+  seedProducts,
   type Category,
   type Product,
   type OrderRecord,
+  useApiAdminDashboard,
+  fetchAdminDashboard,
 } from "@/lib/products";
 import { useApiUsers, promoteUser, removeUser } from "@/lib/adminClient";
-import { Users, BarChart, FileText } from "lucide-react";
 import {
   Bar,
   BarChart as RechartsBarChart,
   CartesianGrid,
   Line,
   LineChart,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
+  Cell,
 } from "recharts";
 import { formatPrice } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/admin")({
-  head: () => ({ meta: [{ title: "Admin — ShopEase" }] }),
+  head: () => ({ meta: [{ title: "Admin â€” ShopEase" }] }),
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData({
+      queryKey: ["admin-dashboard"],
+      queryFn: fetchAdminDashboard,
+    }),
   component: AdminGate,
 });
 
 function AdminGate() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   if (!user) {
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
@@ -73,265 +84,301 @@ function AdminGate() {
 
 type Tab = "overview" | "products" | "categories" | "orders" | "users" | "analytics";
 
-function AdminPage() {
-  const { user } = useAuth();
+export function AdminPage() {
+  const { user, logout } = useAuth();
   const [tab, setTab] = useState<Tab>("overview");
-  const productsQuery = useApiProducts();
-  const categoriesQuery = useApiCategories();
-  const ordersQuery = useApiOrders();
+  const dashboardQuery = useApiAdminDashboard();
   const usersQuery = useApiUsers();
-  const products = productsQuery.data ?? [];
-  const categories = categoriesQuery.data ?? [];
-  const orders = ordersQuery.data ?? [];
+  const products = dashboardQuery.data?.products ?? [];
+  const categories = dashboardQuery.data?.categories ?? [];
+  const orders = dashboardQuery.data?.orders ?? [];
   const users = usersQuery.data ?? [];
-  const loading = productsQuery.isLoading || categoriesQuery.isLoading || ordersQuery.isLoading || usersQuery.isLoading;
-  const queryClient = useQueryClient();
+  const displayProducts = products.length > 0 ? products : seedProducts;
+  const displayCategories = categories.length > 0 ? categories : seedCategories;
+  const dashboardIsPlaceholder = Boolean(dashboardQuery.isPlaceholderData);
+  const dashboardLoading = dashboardQuery.isFetching && !dashboardQuery.data;
+  const productsLoading = dashboardLoading;
+  const categoriesLoading = dashboardLoading;
+  const ordersLoading = dashboardQuery.isFetching && (dashboardIsPlaceholder || orders.length === 0);
+  const usersLoading = usersQuery.isFetching && users.length === 0;
+  const productsError = dashboardQuery.isError;
 
   const totalRevenue = orders.reduce((sum, order) => sum + (order.total || 0), 0);
   const totalOrders = orders.length;
-  const totalProducts = products.length;
+  const totalProducts = displayProducts.length;
   const totalUsers = users.length;
-  const totalVisitors = Math.max(totalUsers * 3, 12487);
-  const revenueByDay = buildRevenueSeries(orders, "day", 7);
-  const ordersByDay = buildOrderSeries(orders, "day", 7);
-  const topCategories = buildCategoryStats(products, 4);
+  const revenueStat = totalRevenue;
+  const customerCount = totalUsers;
+  const orderCount = totalOrders;
+  const inventoryValue = displayProducts.reduce((sum, product) => sum + (product.price || 0), 0);
+  const chartSource = buildRevenueSeries(orders, "month", 6);
+  const orderChartSource = buildOrderSeries(orders, "month", 6);
+  const orderScale = totalOrders > 0 && totalRevenue > 0 ? Math.max(totalRevenue / totalOrders, 1) : 1;
+  const chartData = chartSource.map((point, index) => ({
+    label: point.label.split(" ")[0],
+    revenue: Math.round(point.value),
+    orders: Math.round((orderChartSource[index]?.value ?? 0) * orderScale),
+    orderCount: orderChartSource[index]?.value ?? 0,
+  }));
+  const revenuePercent = totalRevenue > 0 ? 100 : 0;
+  const orderPercent = Math.min(Math.round((totalOrders / Math.max(totalOrders + totalProducts, 1)) * 100), 100);
   const recentOrders = [...orders]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 4);
+  const transactions =
+    recentOrders.length > 0
+      ? recentOrders.map((order, index) => ({
+          id: order.id,
+          title: order.name || `Order ${order.orderNumber}`,
+          detail: `${order.orderNumber} - ${new Date(order.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`,
+          amount: `+${formatPrice(order.total || 0)}`,
+          icon: index % 2 === 0 ? <ShoppingCart className="h-3.5 w-3.5" /> : <ReceiptText className="h-3.5 w-3.5" />,
+        }))
+      : [
+          { id: "empty-orders", title: "No recent orders", detail: "Orders will appear here", amount: formatPrice(0), icon: <ReceiptText className="h-3.5 w-3.5" /> },
+        ];
 
-  const customerGrowth = [
-    { label: "United States", value: 2417, trend: "+8.4%", color: "bg-blue-500/10 text-blue-200" },
-    { label: "Germany", value: 812, trend: "+4.2%", color: "bg-emerald-500/10 text-emerald-200" },
-    { label: "Australia", value: 2281, trend: "+5.9%", color: "bg-violet-500/10 text-violet-200" },
-    { label: "France", value: 287, trend: "-1.0%", color: "bg-rose-500/10 text-rose-200" },
+  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: "overview", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
+    { id: "products", label: "Products", icon: <Package className="h-4 w-4" /> },
+    { id: "categories", label: "Categories", icon: <Tag className="h-4 w-4" /> },
+    { id: "orders", label: "Orders", icon: <List className="h-4 w-4" /> },
+    { id: "users", label: "Customers", icon: <Users className="h-4 w-4" /> },
+    { id: "analytics", label: "Analytics", icon: <BarChart className="h-4 w-4" /> },
   ];
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="rounded-[32px] border border-border bg-card/80 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.35)] backdrop-blur-lg">
-            <div className="mb-8 flex items-center gap-4">
-              <div className="grid h-12 w-12 place-items-center rounded-3xl bg-sky-500/15 text-sky-200 shadow-inner shadow-sky-500/10">
-                <LayoutDashboard className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.35em] text-slate-500">DealDeck</p>
-                <p className="mt-1 text-lg font-semibold text-white">Admin panel</p>
-              </div>
+      <div className="min-h-screen overflow-hidden bg-background">
+        <div className="grid min-h-screen lg:grid-cols-[190px_minmax(0,1fr)]">
+          <aside className="flex flex-col border-b border-border bg-slate-950 p-5 text-white lg:border-b-0 lg:border-r lg:border-slate-800">
+            <div className="mb-7 flex items-center gap-3 px-2">
+              <span className="grid h-9 w-9 place-items-center rounded-2xl bg-primary text-primary-foreground">
+                <ShoppingBag className="h-4 w-4" />
+              </span>
+              <span className="font-display text-lg font-bold">QuickShop</span>
             </div>
-            <div className="space-y-1">
-              <SidebarLink active={tab === "overview"} onClick={() => setTab("overview")} icon={<Activity className="h-4 w-4" />}>
-                Dashboard
-              </SidebarLink>
-              <SidebarLink active={tab === "products"} onClick={() => setTab("products")} icon={<Package className="h-4 w-4" />}>
-                Products
-              </SidebarLink>
-              <SidebarLink active={tab === "categories"} onClick={() => setTab("categories")} icon={<Tag className="h-4 w-4" />}>
-                Categories
-              </SidebarLink>
-              <SidebarLink active={tab === "orders"} onClick={() => setTab("orders")} icon={<List className="h-4 w-4" />}>
-                Orders
-              </SidebarLink>
-              <SidebarLink active={tab === "users"} onClick={() => setTab("users")} icon={<Users className="h-4 w-4" />}>
-                Customers
-              </SidebarLink>
-              <SidebarLink active={tab === "analytics"} onClick={() => setTab("analytics")} icon={<BarChart className="h-4 w-4" />}>
-                Analytics
-              </SidebarLink>
-            </div>
+            <nav className="flex gap-2 overflow-x-auto lg:block lg:space-y-2 lg:overflow-visible">
+              <Link
+                to="/"
+                className="flex shrink-0 items-center gap-3 rounded-lg px-3.5 py-2.5 text-left text-sm font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white lg:w-full"
+              >
+                <ChevronRight className="h-4 w-4 rotate-180" />
+                Back to website
+              </Link>
+              {tabs.map((item) => (
+                <SidebarLink key={item.id} active={tab === item.id} onClick={() => setTab(item.id)} icon={item.icon}>
+                  {item.label}
+                </SidebarLink>
+              ))}
+            </nav>
 
-            <div className="mt-10 rounded-[28px] border border-border bg-card/80 p-5">
-              <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground">Need help?</p>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">Check the documentation or reach out to support for setup and dashboard questions.</p>
-              <button className="mt-4 w-full rounded-full border border-border bg-card/5 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-slate-100/80 dark:hover:bg-white/10">
-                Support center
+            <div className="mt-6 hidden rounded-[18px] bg-slate-900 p-4 text-white shadow-[0_16px_34px_rgba(15,23,42,0.28)] lg:mt-auto lg:block">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-semibold">Store status</p>
+                <span className="text-accent">*</span>
+              </div>
+              <p className="text-xs leading-5 text-white/68">Live catalog, orders, and customer data.</p>
+              <button onClick={logout} className="mt-4 inline-flex h-8 items-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition hover:bg-blue-600">
+                <LogOut className="h-3.5 w-3.5" />
+                Sign out
               </button>
             </div>
           </aside>
 
-          <main className="space-y-6">
-            <div className="rounded-[32px] border border-border bg-card/70 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.35)] backdrop-blur-lg">
-              <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.35em] text-sky-400/70">Sales Report</p>
-                  <h1 className="mt-3 text-3xl font-semibold tracking-tight text-foreground">Store performance dashboard</h1>
-                  <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                    {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
-                  </p>
-                </div>
-                <div className="inline-flex items-center gap-3 rounded-full border border-border bg-card/5 px-4 py-2 text-sm text-muted-foreground">
-                  <span className="grid h-10 w-10 place-items-center rounded-3xl bg-card/10 text-foreground">
-                    {user?.name?.charAt(0) ?? "A"}
-                  </span>
-                  <div className="text-left">
-                    <p className="text-sm font-semibold text-foreground">{user?.name}</p>
-                    <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground">{user?.role}</p>
-                  </div>
+          <main className="min-w-0 bg-slate-50 p-4 sm:p-6">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <label className="flex h-10 w-full items-center gap-2 rounded-lg border border-border bg-white px-3 text-xs text-muted-foreground md:max-w-[360px]">
+                <Search className="h-4 w-4" />
+                <input className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground" placeholder="Search" />
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <button className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-3 text-xs font-semibold text-foreground">
+                  <CalendarDays className="h-3.5 w-3.5 text-primary" />
+                  29.05.2026
+                </button>
+                <button className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-3 text-xs font-semibold text-foreground">
+                  <Globe2 className="h-3.5 w-3.5" />
+                  EN
+                </button>
+                <button className="grid h-10 w-10 place-items-center rounded-lg border border-border bg-white text-foreground" aria-label="Notifications">
+                  <Bell className="h-4 w-4" />
+                </button>
+                <div className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-white px-2.5">
+                  <span className="grid h-7 w-7 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{user?.name?.charAt(0) ?? "A"}</span>
+                  <span className="max-w-[120px] truncate text-xs font-semibold">{user?.name ?? "Admin"}</span>
+                  <MoreVertical className="h-4 w-4 text-muted-foreground" />
                 </div>
               </div>
-
-              {loading ? (
-                <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <div className="overflow-hidden rounded-[28px] border border-border bg-card/80 p-5 animate-pulse">
-                    <div className="h-4 w-32 bg-muted/40 rounded mb-4" />
-                    <div className="h-8 w-20 bg-muted/40 rounded" />
-                    <div className="mt-4 h-3 w-40 bg-muted/40 rounded" />
-                  </div>
-                  <div className="overflow-hidden rounded-[28px] border border-border bg-card/80 p-5 animate-pulse">
-                    <div className="h-4 w-32 bg-muted/40 rounded mb-4" />
-                    <div className="h-8 w-20 bg-muted/40 rounded" />
-                    <div className="mt-4 h-3 w-40 bg-muted/40 rounded" />
-                  </div>
-                  <div className="overflow-hidden rounded-[28px] border border-border bg-card/80 p-5 animate-pulse">
-                    <div className="h-4 w-32 bg-muted/40 rounded mb-4" />
-                    <div className="h-8 w-20 bg-muted/40 rounded" />
-                    <div className="mt-4 h-3 w-40 bg-muted/40 rounded" />
-                  </div>
-                  <div className="overflow-hidden rounded-[28px] border border-border bg-card/80 p-5 animate-pulse">
-                    <div className="h-4 w-32 bg-muted/40 rounded mb-4" />
-                    <div className="h-8 w-20 bg-muted/40 rounded" />
-                    <div className="mt-4 h-3 w-40 bg-muted/40 rounded" />
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <MetricCard
-                    title="Total Sales"
-                    value={formatPrice(Number(totalRevenue.toFixed(0)))}
-                    delta="+2.0%"
-                    description="Products vs last month"
-                    accent="from-sky-500 to-cyan-400"
-                  />
-                  <MetricCard
-                    title="Total Orders"
-                    value={totalOrders}
-                    delta="+12.4%"
-                    description="Orders vs last month"
-                    accent="from-emerald-500 to-lime-400"
-                  />
-                  <MetricCard
-                    title="Visitors"
-                    value={totalVisitors}
-                    delta="-2.0%"
-                    description="Users vs last month"
-                    accent="from-rose-500 to-fuchsia-400"
-                  />
-                  <MetricCard
-                    title="Total Products"
-                    value={totalProducts}
-                    delta="+12.1%"
-                    description="Products vs last month"
-                    accent="from-violet-500 to-indigo-400"
-                  />
-                </div>
-              )}
             </div>
 
             {tab === "overview" ? (
-              <div className="grid gap-6 xl:grid-cols-[1.7fr_0.95fr]">
-                <section className="rounded-[32px] border border-border bg-card/70 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.35)] backdrop-blur-lg">
-                  <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground">Customer habits</p>
-                      <h2 className="mt-3 text-2xl font-semibold text-foreground">Track your customer habits</h2>
-                    </div>
-                    <div className="inline-flex items-center rounded-full border border-border bg-card/5 px-3 py-2 text-sm text-muted-foreground">
-                      <span className="mr-2 inline-flex h-2.5 w-2.5 rounded-full bg-sky-400" /> Seen product
-                    </div>
-                  </div>
-                  <div className="mt-8 h-[360px] rounded-[28px] border border-border bg-card/80 p-4">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RechartsBarChart data={ordersByDay} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.25)" vertical={false} />
-                        <XAxis dataKey="label" tick={{ fill: "rgba(226,232,240,0.75)", fontSize: 12 }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fill: "rgba(226,232,240,0.75)", fontSize: 12 }} axisLine={false} tickLine={false} />
-                        <Tooltip wrapperStyle={{ backgroundColor: "#0f172a", borderRadius: 12, border: "none" }} contentStyle={{ backgroundColor: "#0f172a", border: "1px solid rgba(148,163,184,0.15)", borderRadius: 12 }} labelStyle={{ color: "#fff" }} itemStyle={{ color: "#fff" }} />
-                        <Bar dataKey="value" fill="#60a5fa" radius={[12, 12, 0, 0]} />
-                      </RechartsBarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </section>
-
-                <aside className="space-y-6">
-                  <div className="rounded-[32px] border border-border bg-card/70 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.35)] backdrop-blur-lg">
-                    <div className="flex items-center justify-between gap-4">
+              <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(280px,0.9fr)_minmax(0,1.7fr)]">
+                <section className="space-y-5">
+                  <div className="relative overflow-hidden rounded-[24px] bg-slate-950 p-5 text-white shadow-[0_18px_42px_rgba(15,23,42,0.24)]">
+                    <div className="absolute -right-8 top-10 h-28 w-28 rounded-full bg-accent/35 blur-2xl" />
+                    <div className="relative flex items-start justify-between">
                       <div>
-                        <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground">Product statistic</p>
-                        <h3 className="mt-3 text-lg font-semibold text-foreground">Track your product sales</h3>
+                        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-white/70">Store revenue</p>
+                        <h1 className="mt-3 font-display text-3xl font-bold">{ordersLoading ? "Loading..." : formatPrice(revenueStat)}</h1>
+                        <p className="mt-1 text-xs text-white/60">{ordersLoading ? "Syncing order totals" : `${orderCount} order${orderCount === 1 ? "" : "s"} processed`}</p>
                       </div>
-                      <div className="rounded-full bg-card/80 px-3 py-1 text-xs uppercase tracking-[0.35em] text-muted-foreground">Today</div>
+                      <MoreVertical className="h-5 w-5 text-white/80" />
                     </div>
-                    <div className="mt-7 flex items-center justify-center">
-                      <div className="relative grid h-48 w-48 place-items-center rounded-full bg-card/80">
-                        <div className="absolute inset-4 rounded-full border border-border bg-card/90" />
-                        <div className="absolute inset-8 rounded-full bg-card" />
-                        <div className="relative grid h-40 w-40 place-items-center rounded-full bg-card text-center">
-                          <p className="text-sm uppercase tracking-[0.35em] text-muted-foreground">9.829</p>
-                          <p className="mt-2 text-xs text-muted-foreground">Product sales</p>
-                        </div>
-                      </div>
+                    <div className="relative mt-9">
+                      <p className="text-[11px] text-white/64">Admin account</p>
+                      <p className="mt-2 text-xs tracking-[0.08em] text-white/90">{user?.email ?? "admin@quickshop.local"}</p>
                     </div>
-                    <div className="mt-7 space-y-4">
-                      {topCategories.map((category, index) => (
-                        <div key={category.slug} className="flex items-center justify-between rounded-3xl border border-border bg-card/80 px-4 py-3">
-                          <div>
-                            <p className="font-medium text-foreground">{category.slug}</p>
-                            <p className="text-xs text-muted-foreground">{category.count} products</p>
-                          </div>
-                          <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${index % 2 === 0 ? "bg-emerald-500/10 text-emerald-200" : "bg-sky-500/10 text-sky-200"}`}>
-                            +{Math.round((category.count / (totalProducts || 1)) * 100)}%
-                          </span>
-                        </div>
+                  </div>
+
+                  <div className="rounded-[18px] border border-border bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h2 className="text-xs font-bold uppercase tracking-[0.08em]">Recent orders</h2>
+                      <button className="text-xs font-semibold text-primary">See all</button>
+                    </div>
+                    <div className="space-y-2">
+                      {transactions.map((item) => (
+                        <TransactionRow key={item.id} {...item} />
                       ))}
                     </div>
                   </div>
+                </section>
 
-                  <div className="rounded-[32px] border border-border bg-card/70 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.35)] backdrop-blur-lg">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground">Customer growth</p>
-                        <h3 className="mt-3 text-lg font-semibold text-foreground">Track customer by locations</h3>
-                      </div>
-                      <div className="rounded-full bg-card/80 px-3 py-1 text-xs uppercase tracking-[0.35em] text-muted-foreground">Today</div>
+                <section className="space-y-5">
+                  <div className="rounded-[18px] border border-border bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+                    <div className="mb-4 flex items-center justify-between">
+                      <h2 className="text-xs font-bold uppercase tracking-[0.08em]">Store statistics</h2>
+                      <button className="rounded-lg bg-slate-100 px-3 py-1.5 text-[11px] font-semibold">1 month</button>
                     </div>
-                    <div className="mt-6 space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        {customerGrowth.slice(0, 2).map((item) => (
-                          <div key={item.label} className="rounded-[28px] border border-border bg-card/80 p-4">
-                            <p className="text-xs text-muted-foreground">{item.label}</p>
-                            <p className="mt-2 text-xl font-semibold text-foreground">{item.value}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">{item.trend}</p>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        {customerGrowth.slice(2).map((item) => (
-                          <div key={item.label} className="rounded-[28px] border border-border bg-card/80 p-4">
-                            <p className="text-xs text-muted-foreground">{item.label}</p>
-                            <p className="mt-2 text-xl font-semibold text-foreground">{item.value}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">{item.trend}</p>
-                          </div>
-                        ))}
-                      </div>
+                    <div className="grid gap-3 md:grid-cols-[1fr_1fr_72px]">
+                      <SpendingCard title="Revenue" value={ordersLoading ? "Loading..." : formatPrice(totalRevenue)} detail={ordersLoading ? "Syncing orders" : `${totalOrders} order${totalOrders === 1 ? "" : "s"}`} percent={revenuePercent} color="#2563eb" />
+                      <SpendingCard title="Catalog value" value={formatPrice(inventoryValue)} detail={`${totalProducts} product${totalProducts === 1 ? "" : "s"}`} percent={orderPercent} color="#ff6b5a" />
+                      <button onClick={() => setTab("products")} className="grid min-h-24 place-items-center rounded-[18px] border border-dashed border-slate-300 bg-white text-xs font-semibold text-slate-600 transition hover:border-primary hover:text-primary">
+                        <span className="grid gap-1 text-center">
+                          <Plus className="mx-auto h-4 w-4" />
+                          Product
+                        </span>
+                      </button>
                     </div>
                   </div>
-                </aside>
+
+                  <div className="rounded-[18px] border border-border bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+                    <div className="mb-4 flex items-center justify-between">
+                      <h2 className="text-xs font-bold uppercase tracking-[0.08em]">Sales overview</h2>
+                      <button className="rounded-lg bg-slate-100 px-3 py-1.5 text-[11px] font-semibold">6 months</button>
+                    </div>
+                    <div className="h-[250px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RechartsBarChart data={chartData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                          <CartesianGrid vertical={false} stroke="#e5e7eb" />
+                          <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#64748b" }} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#64748b" }} tickFormatter={(value) => formatPrice(Number(value))} />
+                          <Tooltip
+                            formatter={(value, name, props) => {
+                              if (name === "orders") return [props.payload.orderCount, "Orders"];
+                              return [formatPrice(Number(value)), "Revenue"];
+                            }}
+                          />
+                          <Bar dataKey="revenue" fill="#2563eb" radius={[5, 5, 0, 0]} barSize={9} />
+                          <Bar dataKey="orders" fill="#ff6b5a" radius={[5, 5, 0, 0]} barSize={9} />
+                        </RechartsBarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="mt-2 flex items-center justify-center gap-6 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-2"><i className="h-2 w-4 rounded-full bg-primary" />Revenue</span>
+                      <span className="inline-flex items-center gap-2"><i className="h-2 w-4 rounded-full bg-accent" />Orders</span>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <DashboardMetric label="Customers" value={usersLoading ? "Loading..." : customerCount} detail="Registered accounts" />
+                    <DashboardMetric label="Orders" value={ordersLoading ? "Loading..." : orderCount} detail={ordersLoading ? "Syncing revenue" : formatPrice(totalRevenue)} />
+                    <DashboardMetric label="Categories" value={displayCategories.length} detail={`${totalProducts} products`} />
+                  </div>
+                </section>
               </div>
             ) : tab === "products" ? (
-              <ProductsTab products={products} categories={categories} loading={loading} />
+              <ProductsTab products={products} categories={categories} loading={productsLoading} hasError={productsError} />
             ) : tab === "categories" ? (
-              <CategoriesTab categories={categories} products={products} loading={loading} />
+              <CategoriesTab categories={categories} products={products} loading={categoriesLoading} />
             ) : tab === "orders" ? (
-              <OrdersTab orders={orders} loading={loading} />
+              <OrdersTab orders={orders} loading={ordersLoading} />
             ) : tab === "users" ? (
-              <UsersTab loading={loading} />
+              <UsersTab loading={usersLoading} />
             ) : (
-              <AnalyticsTab orders={orders} products={products} users={users} loading={loading} />
+              <AnalyticsTab orders={orders} products={products} users={users} loading={ordersLoading || productsLoading || usersLoading} />
             )}
           </main>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TransactionRow({ title, detail, amount, icon }: { title: string; detail: string; amount: string; icon: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between rounded-xl px-1.5 py-2.5">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">{icon}</span>
+        <span className="min-w-0">
+          <p className="truncate text-sm font-semibold text-foreground">{title}</p>
+          <p className="text-xs text-muted-foreground">{detail}</p>
+        </span>
+      </div>
+      <span className={`shrink-0 text-sm font-semibold ${amount.startsWith("+") ? "text-primary" : "text-foreground"}`}>{amount}</span>
+    </div>
+  );
+}
+
+function SpendingCard({ title, value, detail, percent, color }: { title: string; value: string; detail: string; percent: number; color: string }) {
+  return (
+    <div className="flex min-h-24 items-center justify-between gap-3 rounded-[18px] bg-slate-50 p-4">
+      <div>
+        <p className="text-xs font-bold text-foreground">* {title}</p>
+        <p className="mt-3 text-2xl font-bold text-primary">{value}</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">{detail}</p>
+      </div>
+      <div
+        className="grid h-14 w-14 place-items-center rounded-full text-xs font-bold text-foreground"
+        style={{ background: `conic-gradient(${color} ${percent}%, #e5e7eb 0)` }}
+      >
+        <span className="grid h-10 w-10 place-items-center rounded-full bg-slate-50">{percent}%</span>
+      </div>
+    </div>
+  );
+}
+
+function DashboardMetric({ label, value, detail }: { label: string; value: string | number; detail: string }) {
+  return (
+    <div className="rounded-[16px] border border-border bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+      <p className="text-xs uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-primary">{value}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+    </div>
+  );
+}
+
+function SummaryCard({
+  title,
+  value,
+  delta,
+  description,
+}: {
+  title: string;
+  value: string | number;
+  delta: string;
+  description: string;
+}) {
+  return (
+    <div className="overflow-hidden rounded-[28px] border border-border bg-card/80 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-[0.35em] text-muted-foreground">{title}</p>
+          <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
+        </div>
+        <div className="inline-flex rounded-full bg-slate-900/80 px-3 py-1 text-sm font-semibold text-white/90">{delta}</div>
+      </div>
+      <p className="mt-4 text-sm text-muted-foreground">{description}</p>
     </div>
   );
 }
@@ -377,8 +424,8 @@ function SidebarLink({
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-center gap-3 rounded-3xl px-4 py-3 text-left text-sm font-medium transition ${
-        active ? "bg-white/10 text-white shadow-[0_10px_30px_rgba(255,255,255,0.08)]" : "text-slate-300 hover:bg-white/5 hover:text-white"
+      className={`flex shrink-0 items-center gap-3 rounded-lg px-3.5 py-2.5 text-left text-sm font-semibold transition lg:w-full ${
+        active ? "bg-primary text-primary-foreground shadow-[0_10px_20px_rgba(37,99,235,0.22)]" : "text-slate-300 hover:bg-slate-800 hover:text-white"
       }`}
     >
       {icon}
@@ -449,6 +496,7 @@ function CategoriesTab({ categories, products, loading }: { categories: Category
 
     try {
       await fetchCreateCategory(n);
+      queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       setName("");
     } catch (error) {
@@ -456,12 +504,18 @@ function CategoriesTab({ categories, products, loading }: { categories: Category
     }
   }
 
-  async function remove(slug: string) {
-    const inUse = products.filter((p) => p.category === slug).length;
-    if (inUse > 0 && !confirm(`${inUse} product(s) use this category. Delete anyway?`)) return;
+  async function remove(slug: string, inUse: number) {
+    if (inUse > 0) {
+      alert(
+        `This category cannot be deleted because ${inUse} product${inUse === 1 ? "" : "s"} still use it. ` +
+        "Remove or reassign those products first."
+      );
+      return;
+    }
 
     try {
       await fetchDeleteCategory(slug);
+      queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["categories"] });
     } catch (error) {
       alert(error instanceof Error ? error.message : String(error));
@@ -475,6 +529,7 @@ function CategoriesTab({ categories, products, loading }: { categories: Category
 
     try {
       await fetchUpdateCategory(editingSlug, n);
+      queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       setEditingSlug(null);
       setEditingName("");
@@ -490,9 +545,9 @@ function CategoriesTab({ categories, products, loading }: { categories: Category
           <h2 className="font-semibold">All categories</h2>
         </div>
         {categories.length === 0 ? (
-          <p className="px-5 py-10 text-center text-sm text-muted-foreground">No categories yet. Add your first one →</p>
+          <p className="px-5 py-10 text-center text-sm text-muted-foreground">No categories yet. Add your first one â†’</p>
         ) : (
-          <ul className="divide-y divide-border">
+          <ul className="grid divide-y divide-border lg:grid-cols-2 lg:divide-x lg:divide-y-0 xl:grid-cols-3">
             {categories.map((c) => {
               const count = products.filter((p) => p.category === c.slug).length;
               const editing = editingSlug === c.slug;
@@ -509,7 +564,7 @@ function CategoriesTab({ categories, products, loading }: { categories: Category
                   ) : (
                     <div className="flex-1">
                       <p className="text-sm font-medium">{c.name}</p>
-                      <p className="text-xs text-muted-foreground">/{c.slug} · {count} product{count === 1 ? "" : "s"}</p>
+                      <p className="text-xs text-muted-foreground">/{c.slug} Â· {count} product{count === 1 ? "" : "s"}</p>
                     </div>
                   )}
                   <div className="flex gap-1">
@@ -521,7 +576,14 @@ function CategoriesTab({ categories, products, loading }: { categories: Category
                     ) : (
                       <>
                         <IconBtn onClick={() => { setEditingSlug(c.slug); setEditingName(c.name); }} title="Edit"><Pencil className="h-4 w-4" /></IconBtn>
-                        <IconBtn onClick={() => remove(c.slug)} title="Delete" danger><Trash2 className="h-4 w-4" /></IconBtn>
+                        <IconBtn
+                          onClick={() => remove(c.slug, count)}
+                          title={count > 0 ? `Cannot delete category while ${count} product${count === 1 ? "" : "s"} belong to it` : "Delete"}
+                          danger
+                          disabled={count > 0}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </IconBtn>
                       </>
                     )}
                   </div>
@@ -552,23 +614,47 @@ function CategoriesTab({ categories, products, loading }: { categories: Category
 
 /* ---------------- Products ---------------- */
 
-function ProductsTab({ products, categories, loading }: { products: Product[]; categories: Category[]; loading: boolean }) {
+function ProductsTab({ products, categories, loading, hasError }: { products: Product[]; categories: Category[]; loading: boolean; hasError: boolean }) {
   const [editing, setEditing] = useState<Product | null>(null);
   const [creating, setCreating] = useState(false);
   const queryClient = useQueryClient();
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <div className="rounded-2xl border border-border bg-card p-6 animate-pulse">
-          <div className="h-4 w-40 rounded bg-muted/40 mb-4" />
-          <div className="h-4 w-32 rounded bg-muted/40 mb-4" />
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {[...Array(4)].map((_, index) => (
-              <div key={index} className="h-24 rounded-2xl bg-muted/40" />
+      <div className="mt-5">
+        <div className="rounded-[18px] border border-border bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <div className="h-3 w-24 rounded bg-slate-200" />
+              <div className="mt-3 h-7 w-44 rounded bg-slate-200" />
+            </div>
+            <div className="h-10 w-32 rounded-full bg-slate-200" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {[...Array(6)].map((_, index) => (
+              <div key={index} className="h-36 rounded-[18px] bg-slate-100" />
             ))}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="mt-5 rounded-[18px] border border-destructive/30 bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+        <h2 className="font-display text-xl font-semibold text-foreground">Products could not load</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Check that the API/database is running, then refresh the dashboard.</p>
+        <button
+          type="button"
+          onClick={() => {
+            queryClient.invalidateQueries({ queryKey: ["products"] });
+            queryClient.invalidateQueries({ queryKey: ["categories"] });
+          }}
+          className="mt-5 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-blue-600"
+        >
+          Retry
+        </button>
       </div>
     );
   }
@@ -577,6 +663,7 @@ function ProductsTab({ products, categories, loading }: { products: Product[]; c
     if (!confirm("Delete this product?")) return;
     try {
       await fetchDeleteProduct(id);
+      queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
     } catch (error) {
       alert(error instanceof Error ? error.message : String(error));
@@ -591,6 +678,7 @@ function ProductsTab({ products, categories, loading }: { products: Product[]; c
       } else {
         await fetchCreateProduct(p);
       }
+      queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setEditing(null);
       setCreating(false);
@@ -601,20 +689,29 @@ function ProductsTab({ products, categories, loading }: { products: Product[]; c
 
   if (creating || editing) {
     return (
-      <ProductForm
-        initial={editing ?? blankProduct(categories[0]?.slug ?? "")}
-        categories={categories}
-        onCancel={() => { setEditing(null); setCreating(false); }}
-        onSave={upsert}
-      />
+      <div className="mt-5">
+        <ProductForm
+          initial={editing ?? blankProduct(categories[0]?.slug ?? "")}
+          categories={categories}
+          onCancel={() => { setEditing(null); setCreating(false); }}
+          onSave={upsert}
+        />
+      </div>
     );
   }
 
   return (
-    <div>
-      <div className="flex justify-between gap-3">
-        <p className="text-sm text-muted-foreground">{products.length} products</p>
+    <div className="mt-5 space-y-5">
+      <div className="flex flex-col gap-4 rounded-[18px] border border-border bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.06)] sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Catalog</p>
+          <h2 className="mt-1 font-display text-2xl font-semibold">Products</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {products.length} product{products.length === 1 ? "" : "s"} across {categories.length} categor{categories.length === 1 ? "y" : "ies"}
+          </p>
+        </div>
         <button
+          type="button"
           onClick={() => setCreating(true)}
           disabled={categories.length === 0}
           className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
@@ -623,22 +720,22 @@ function ProductsTab({ products, categories, loading }: { products: Product[]; c
         </button>
       </div>
       {categories.length === 0 && (
-        <p className="mt-3 rounded-lg border border-border bg-muted/50 p-3 text-sm text-muted-foreground">
+        <p className="rounded-[18px] border border-border bg-white p-4 text-sm text-muted-foreground shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
           Add a category first to create products.
         </p>
       )}
 
-      <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="overflow-hidden rounded-[18px] border border-border bg-white shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
         {products.length === 0 ? (
           <p className="px-5 py-10 text-center text-sm text-muted-foreground">No products yet.</p>
         ) : (
           <ul className="divide-y divide-border">
             {products.map((p) => (
-              <li key={p.id} className="flex items-center gap-4 px-4 py-3">
-                <img src={p.image} alt={p.name} className="h-14 w-14 shrink-0 rounded-lg object-cover" />
+              <li key={p.id} className="flex min-w-0 gap-4 p-4">
+                <img src={p.image} alt={p.name} className="h-20 w-20 shrink-0 rounded-xl bg-slate-100 object-cover" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{p.name}</p>
-                  <p className="text-xs text-muted-foreground">{categoryName(p.category, categories)} · {formatPrice(p.price)}</p>
+                  <p className="text-xs text-muted-foreground">{categoryName(p.category, categories)} Â· {formatPrice(p.price)}</p>
                 </div>
                 <div className="hidden gap-1 sm:flex">
                   {p.isFeatured && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Featured</span>}
@@ -903,7 +1000,7 @@ function OverviewTab({ orders, products, users, loading }: { orders: OrderRecord
                     </div>
                     <p className="text-sm font-semibold">{formatPrice(order.total || 0)}</p>
                   </div>
-                  <p className="mt-2 text-sm text-muted-foreground">{order.name} · {order.email}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{order.name} Â· {order.email}</p>
                 </div>
               ))}
             </div>
@@ -1181,7 +1278,7 @@ function AnalyticsTab({ orders, products, users, loading }: { orders: OrderRecor
                   </div>
                   <p className="text-sm font-semibold">{formatPrice(order.total || 0)}</p>
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">{order.name} · {order.email}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{order.name} Â· {order.email}</p>
               </div>
             ))}
           </div>
@@ -1197,6 +1294,7 @@ function blankProduct(category: string): Product {
     name: "",
     category,
     price: 0,
+    stock: 0,
     image: "",
     description: "",
     isFeatured: false,
@@ -1226,7 +1324,8 @@ function ProductForm({
     e.preventDefault();
     if (!p.name.trim()) return setErr("Name is required.");
     if (!p.category) return setErr("Category is required.");
-    if (p.price < 0) return setErr("Price must be ≥ 0.");
+    if (p.price < 0) return setErr("Price must be â‰¥ 0.");
+    if (p.stock < 0) return setErr("Stock must be â‰¥ 0.");
     if (!p.image.trim()) return setErr("Image URL is required.");
     onSave({ ...p, name: p.name.trim(), description: p.description.trim(), image: p.image.trim() });
   }
@@ -1250,6 +1349,10 @@ function ProductForm({
             <input type="number" min={0} step={1} value={p.price} onChange={(e) => update("price", Number(e.target.value))} className={inputCls} />
           </FieldRow>
         </div>
+
+        <FieldRow label="Stock">
+          <input type="number" min={0} step={1} value={p.stock} onChange={(e) => update("stock", Number(e.target.value))} className={inputCls} />
+        </FieldRow>
 
         <FieldRow label="Image URL">
           <input value={p.image} onChange={(e) => update("image", e.target.value)} className={inputCls} placeholder="https://..." />
@@ -1308,15 +1411,20 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
   );
 }
 
-function IconBtn({ children, onClick, title, danger }: { children: React.ReactNode; onClick: () => void; title: string; danger?: boolean }) {
+function IconBtn({ children, onClick, title, danger, disabled }: { children: React.ReactNode; onClick: () => void; title: string; danger?: boolean; disabled?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
+      disabled={disabled}
       className={
         "grid h-8 w-8 place-items-center rounded-lg border border-border bg-background transition " +
-        (danger ? "hover:border-destructive hover:text-destructive" : "hover:border-primary hover:text-primary")
+        (disabled
+          ? "cursor-not-allowed opacity-50"
+          : danger
+          ? "hover:border-destructive hover:text-destructive"
+          : "hover:border-primary hover:text-primary")
       }
     >
       {children}
@@ -1326,4 +1434,3 @@ function IconBtn({ children, onClick, title, danger }: { children: React.ReactNo
 
 const inputCls =
   "w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
-

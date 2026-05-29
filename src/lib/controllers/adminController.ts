@@ -47,6 +47,7 @@ export function validateProduct(product: Product) {
   if (!product.name.trim()) return "Name is required.";
   if (!product.category) return "Category is required.";
   if (product.price < 0) return "Price must be ≥ 0.";
+  if (product.stock < 0) return "Stock must be ≥ 0.";
   if (!product.image.trim()) return "Image URL is required.";
   return null;
 }

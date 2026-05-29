@@ -67,6 +67,9 @@ function ProductPage() {
           <p className="mt-4 text-2xl font-bold text-foreground">{formatPrice(product.price)}</p>
 
           <p className="mt-6 leading-relaxed text-muted-foreground">{product.description}</p>
+          <p className="mt-4 text-sm font-medium text-foreground">
+            {product.stock > 0 ? `In stock: ${product.stock}` : "Out of stock"}
+          </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <div className="flex items-center rounded-full border border-border bg-card">
@@ -74,13 +77,19 @@ function ProductPage() {
                 <Minus className="h-4 w-4" />
               </button>
               <span className="w-10 text-center text-sm font-semibold">{qty}</span>
-              <button onClick={() => setQty((q) => q + 1)} className="px-3 py-2.5 text-foreground/70 hover:text-primary" aria-label="Increase">
+              <button
+                onClick={() => setQty((q) => Math.min(product.stock, q + 1))}
+                disabled={qty >= product.stock || product.stock <= 0}
+                className="px-3 py-2.5 text-foreground/70 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Increase"
+              >
                 <Plus className="h-4 w-4" />
               </button>
             </div>
             <button
               onClick={() => { add(product.id, qty); setAdded(true); setTimeout(() => setAdded(false), 1800); }}
-              className="flex-1 rounded-full bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90 sm:flex-none"
+              disabled={product.stock <= 0}
+              className="flex-1 rounded-full bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90 sm:flex-none disabled:cursor-not-allowed disabled:opacity-50"
             >
               {added ? "Added to cart ✓" : "Add to cart"}
             </button>

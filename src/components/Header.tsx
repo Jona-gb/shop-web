@@ -127,7 +127,7 @@ export function Header() {
           </Link>
           {user?.role === "admin" && (
             <Link
-              to="/admin"
+              to="/dashboard"
               className="hidden h-10 w-10 items-center justify-center rounded-full border border-slate-800 bg-slate-900 text-white transition hover:bg-slate-800/80 sm:inline-flex"
               aria-label="Admin"
             >
@@ -160,7 +160,7 @@ export function Header() {
                   </div>
                   {user.role === "admin" && (
                     <Link
-                      to="/admin"
+                      to="/dashboard"
                       onClick={() => setMenu(false)}
                       className="flex items-center gap-2 px-4 py-2 text-sm text-white transition hover:bg-slate-800/80"
                     >
@@ -232,7 +232,7 @@ export function Header() {
             ))}
             {user?.role === "admin" && (
               <Link
-                to="/admin"
+                to="/dashboard"
                 onClick={() => setOpen(false)}
                 className="mt-2 rounded-2xl bg-sky-500 px-3 py-2.5 text-sm font-semibold text-white"
               >

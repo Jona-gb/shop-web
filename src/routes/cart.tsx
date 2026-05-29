@@ -50,6 +50,7 @@ function CartPage() {
                       {product.name}
                     </Link>
                     <p className="mt-0.5 text-xs text-muted-foreground">{categoryName(product.category)}</p>
+                    <p className="mt-2 text-xs text-foreground">{product.stock > 0 ? `Available: ${product.stock}` : "Out of stock"}</p>
                   </div>
                   <button onClick={() => remove(product.id)} className="text-muted-foreground hover:text-destructive" aria-label="Remove">
                     <X className="h-4 w-4" />
@@ -61,7 +62,11 @@ function CartPage() {
                       <Minus className="h-3.5 w-3.5" />
                     </button>
                     <span className="w-8 text-center text-sm font-semibold">{qty}</span>
-                    <button onClick={() => setQty(product.id, qty + 1)} className="px-2.5 py-1.5 text-foreground/70 hover:text-primary">
+                    <button
+                      onClick={() => setQty(product.id, Math.min(product.stock, qty + 1))}
+                      disabled={qty >= product.stock || product.stock <= 0}
+                      className="px-2.5 py-1.5 text-foreground/70 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                    >
                       <Plus className="h-3.5 w-3.5" />
                     </button>
                   </div>

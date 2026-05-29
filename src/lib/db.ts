@@ -68,12 +68,15 @@ async function initSchema(pool: Pool) {
       name TEXT NOT NULL,
       category VARCHAR(191) NOT NULL,
       price DOUBLE NOT NULL,
+      stock INT NOT NULL DEFAULT 0,
       image TEXT NOT NULL,
       description TEXT NOT NULL,
       isNew TINYINT(1) NOT NULL,
       isFeatured TINYINT(1) NOT NULL,
       FOREIGN KEY (category) REFERENCES categories(slug)
     )`);
+
+  await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INT NOT NULL DEFAULT 0`);
 
   const [categoryIndexRows] = await pool.query<RowDataPacket[]>(
     "SHOW INDEX FROM products WHERE Key_name = 'idx_products_category'",
@@ -136,13 +139,14 @@ async function initSchema(pool: Pool) {
   const productCount = Number(productRows[0]?.count ?? 0);
   if (productCount === 0) {
     await pool.query(
-      `INSERT INTO products (id, name, category, price, image, description, isNew, isFeatured)
-       VALUES ${seedProducts.map(() => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}`,
+      `INSERT INTO products (id, name, category, price, stock, image, description, isNew, isFeatured)
+       VALUES ${seedProducts.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}`,
       seedProducts.flatMap((product) => [
         product.id,
         product.name,
         product.category,
         product.price,
+        product.stock,
         product.image,
         product.description,
         product.isNew ? 1 : 0,
@@ -392,13 +396,14 @@ export async function createProduct(product: Product): Promise<Product> {
   await ensureInitialized();
   const pool = await poolPromise;
   await pool.query(
-    `INSERT INTO products (id, name, category, price, image, description, isNew, isFeatured)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (id, name, category, price, stock, image, description, isNew, isFeatured)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       product.id,
       product.name,
       product.category,
       product.price,
+      product.stock,
       product.image,
       product.description,
       product.isNew ? 1 : 0,
@@ -412,12 +417,13 @@ export async function updateProduct(product: Product): Promise<Product> {
   await ensureInitialized();
   const pool = await poolPromise;
   const [result] = await pool.query<import("mysql2").OkPacket>(
-    `UPDATE products SET name = ?, category = ?, price = ?, image = ?, description = ?, isNew = ?, isFeatured = ?
+    `UPDATE products SET name = ?, category = ?, price = ?, stock = ?, image = ?, description = ?, isNew = ?, isFeatured = ?
      WHERE id = ?`,
     [
       product.name,
       product.category,
       product.price,
+      product.stock,
       product.image,
       product.description,
       product.isNew ? 1 : 0,
@@ -458,13 +464,14 @@ export async function resetStore(): Promise<void> {
 
   if (seedProducts.length > 0) {
     await pool.query(
-      `INSERT INTO products (id, name, category, price, image, description, isNew, isFeatured)
-       VALUES ${seedProducts.map(() => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}`,
+      `INSERT INTO products (id, name, category, price, stock, image, description, isNew, isFeatured)
+       VALUES ${seedProducts.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}`,
       seedProducts.flatMap((product) => [
         product.id,
         product.name,
         product.category,
         product.price,
+        product.stock,
         product.image,
         product.description,
         product.isNew ? 1 : 0,

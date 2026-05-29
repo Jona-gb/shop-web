@@ -121,6 +121,15 @@ export async function handleApiRequest(request) {
     );
   }
 
+  if (path === '/api/admin/dashboard' && request.method === 'GET') {
+    const [products, categories, orders] = await Promise.all([
+      getProducts(),
+      getCategories(),
+      getOrders(),
+    ]);
+    return json({ products, categories, orders }, 200, { 'cache-control': 'no-store' });
+  }
+
   if (path === '/api/products/home' && request.method === 'GET') {
     return json(await getHomePageProducts());
   }

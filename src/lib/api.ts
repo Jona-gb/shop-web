@@ -86,17 +86,27 @@ export async function handleApiRequest(request: Request): Promise<Response> {
   const path = url.pathname.replace(/\/+$/, "");
   const startTime = performance.now();
 
-  if (path === "/api/categories" && request.method === "GET") {
-    return json(await getCategories());
-  }
+  try {
+    if (path === "/api/categories" && request.method === "GET") {
+      return json(await getCategories());
+    }
 
-  if (path === "/api/products" && request.method === "GET") {
-    const limitValue = url.searchParams.get("limit");
-    return json(await getProducts(
-      url.searchParams.get("category") ?? undefined,
-      url.searchParams.get("q") ?? undefined,
-      limitValue ? Number(limitValue) : undefined,
-    ));
+    if (path === "/api/products" && request.method === "GET") {
+      const limitValue = url.searchParams.get("limit");
+      return json(await getProducts(
+        url.searchParams.get("category") ?? undefined,
+        url.searchParams.get("q") ?? undefined,
+        limitValue ? Number(limitValue) : undefined,
+      ));
+    }
+
+  if (path === "/api/admin/dashboard" && request.method === "GET") {
+    const [products, categories, orders] = await Promise.all([
+      getProducts(),
+      getCategories(),
+      getOrders(),
+    ]);
+    return json({ products, categories, orders }, 200, { "cache-control": "no-store" });
   }
 
   if (path === "/api/products/home" && request.method === "GET") {
@@ -131,7 +141,7 @@ export async function handleApiRequest(request: Request): Promise<Response> {
       return badRequest({ error: "Category name is required." });
     }
     const category = await createCategory(body.name);
-    return json(category, 201);
+    return json(category, 201, { "cache-control": "no-store" });
   }
 
   if (path.startsWith("/api/admin/categories/") && request.method === "PUT") {
@@ -141,13 +151,13 @@ export async function handleApiRequest(request: Request): Promise<Response> {
       return badRequest({ error: "Category name is required." });
     }
     const category = await updateCategory(slug, body.name);
-    return json(category);
+    return json(category, 200, { "cache-control": "no-store" });
   }
 
   if (path.startsWith("/api/admin/categories/") && request.method === "DELETE") {
     const slug = path.replace("/api/admin/categories/", "");
     await deleteCategory(slug);
-    return json({ success: true });
+    return json({ success: true }, 200, { "cache-control": "no-store" });
   }
 
   if (path === "/api/admin/products" && request.method === "POST") {
@@ -156,7 +166,7 @@ export async function handleApiRequest(request: Request): Promise<Response> {
       return badRequest({ error: "Product data is required." });
     }
     const product = await createProduct(body as any);
-    return json(product, 201);
+    return json(product, 201, { "cache-control": "no-store" });
   }
 
   if (path.startsWith("/api/admin/products/") && request.method === "PUT") {
@@ -166,13 +176,13 @@ export async function handleApiRequest(request: Request): Promise<Response> {
       return badRequest({ error: "Product data is required." });
     }
     const product = await updateProduct({ ...(body as any), id });
-    return json(product);
+    return json(product, 200, { "cache-control": "no-store" });
   }
 
   if (path.startsWith("/api/admin/products/") && request.method === "DELETE") {
     const id = path.replace("/api/admin/products/", "");
     await deleteProduct(id);
-    return json({ success: true });
+    return json({ success: true }, 200, { "cache-control": "no-store" });
   }
 
   if (path === "/api/admin/reset" && request.method === "POST") {
@@ -181,7 +191,7 @@ export async function handleApiRequest(request: Request): Promise<Response> {
   }
 
   if (path === "/api/admin/orders" && request.method === "GET") {
-    return json(await getOrders());
+    return json(await getOrders(), 200, { "cache-control": "no-store" });
   }
 
   if (path === "/api/cart" && request.method === "GET") {
@@ -291,4 +301,17 @@ export async function handleApiRequest(request: Request): Promise<Response> {
   }
 
   return json({ error: "API route not found" }, 404);
+  } catch (error) {
+    console.error(error);
+    if (error instanceof Error) {
+      if (error.message.includes("still in use")) {
+        return json({ error: error.message }, 400);
+      }
+      if (error.message.includes("not found")) {
+        return json({ error: error.message }, 404);
+      }
+      return json({ error: error.message }, 500);
+    }
+    return json({ error: "Internal server error" }, 500);
+  }
 }
