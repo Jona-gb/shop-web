@@ -118,7 +118,7 @@ function HomePage() {
   ];
 
   return (
-    <div className="bg-white">
+    <div className="bg-background">
       <HeroSection
         image={heroPhoneImage}
         headline="Galaxy S13+ Ultra."

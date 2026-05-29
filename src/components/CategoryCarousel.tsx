@@ -15,7 +15,7 @@ interface CategoryCarouselProps {
 
 export function CategoryCarousel({ categories, title = "Shop by Category" }: CategoryCarouselProps) {
   return (
-    <section className="bg-white">
+    <section className="bg-background">
       <div className="shop-container py-14">
         <div className="flex items-end justify-between gap-4">
           <div>
@@ -32,13 +32,13 @@ export function CategoryCarousel({ categories, title = "Shop by Category" }: Cat
                 key={category.slug}
                 to="/products"
                 search={{ category: category.slug }}
-                className="group soft-panel flex min-h-36 flex-col items-center justify-center rounded-2xl p-5 text-center transition duration-300 hover:-translate-y-1 hover:border-[#bfdbfe] hover:bg-[#f8fbff]"
+                className="group soft-panel flex min-h-36 flex-col items-center justify-center rounded-2xl p-5 text-center transition duration-300 hover:-translate-y-1 hover:border-primary hover:bg-background"
               >
-                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#f8fbff] shadow-sm transition group-hover:bg-[#2563eb] group-hover:shadow-md">
-                  <Icon className="h-7 w-7 text-[#111827] transition group-hover:text-white" />
+                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-primary/10 shadow-sm transition group-hover:bg-primary group-hover:shadow-md">
+                  <Icon className="h-7 w-7 text-foreground transition group-hover:text-white" />
                 </div>
-                <h3 className="mt-4 text-sm font-semibold text-[#111827]">{category.name}</h3>
-                <p className="mt-1 text-[11px] font-medium text-[#64748b]">{category.count} items</p>
+                <h3 className="mt-4 text-sm font-semibold text-foreground">{category.name}</h3>
+                <p className="mt-1 text-[11px] font-medium text-muted-foreground">{category.count} items</p>
               </Link>
             );
           })}

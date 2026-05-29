@@ -145,10 +145,10 @@
   }
 
   .section-heading {
-    @apply font-display text-2xl font-semibold text-[#111827] sm:text-3xl;
+    @apply font-display text-2xl font-semibold text-foreground sm:text-3xl;
   }
 
   .soft-panel {
-    @apply border border-[#e5e7eb] bg-white shadow-[0_18px_50px_rgba(15,23,42,0.06)];
+    @apply border border-border bg-card shadow-[0_18px_50px_rgba(15,23,42,0.06)];
   }
 }

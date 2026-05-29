@@ -21,7 +21,7 @@ interface FeaturedSectionProps {
 
 export function FeaturedSection({ banners, title = "Featured Collections" }: FeaturedSectionProps) {
   return (
-    <section className="bg-white pb-16">
+    <section className="bg-background pb-16">
       <div className="shop-container">
         {title && (
           <div className="mb-8">
@@ -35,7 +35,7 @@ export function FeaturedSection({ banners, title = "Featured Collections" }: Fea
             <Link
               key={banner.id}
               to={banner.link}
-              className={`group relative grid min-h-[250px] overflow-hidden rounded-3xl border border-white/70 p-8 shadow-[0_18px_55px_rgba(32,25,17,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(32,25,17,0.12)] ${toneClass(banner.tone)}`}
+              className={`group relative grid min-h-[250px] overflow-hidden rounded-3xl border border-border/70 p-8 shadow-[0_18px_55px_rgba(32,25,17,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(32,25,17,0.12)] ${toneClass(banner.tone)}`}
             >
               <div className="absolute inset-x-0 top-0 h-px bg-white/80" />
               <div className="relative z-10 max-w-[58%]">
@@ -43,16 +43,16 @@ export function FeaturedSection({ banners, title = "Featured Collections" }: Fea
                   <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#64748b]">{banner.badge}</p>
                 )}
                 {banner.discount && (
-                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#2563eb]">{banner.discount}</p>
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">{banner.discount}</p>
                 )}
                 <div className="mt-3">
-                  <h3 className="font-display text-2xl font-semibold leading-tight text-[#111827]">
+                  <h3 className="font-display text-2xl font-semibold leading-tight text-foreground">
                     {banner.title}
                   </h3>
                   {banner.description && (
-                    <p className="mt-2 text-sm font-medium text-[#4f4b45]">{banner.description}</p>
+                    <p className="mt-2 text-sm font-medium text-muted-foreground">{banner.description}</p>
                   )}
-                  <div className="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-[#111827] transition group-hover:text-[#2563eb]">
+                  <div className="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-foreground transition group-hover:text-primary">
                     {banner.linkText || "Shop now"}
                     <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
                   </div>

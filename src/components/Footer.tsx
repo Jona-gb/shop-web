@@ -1,16 +1,16 @@
 export function Footer() {
   return (
-    <footer className="mt-20 border-t border-[#e5e7eb] bg-[#111827] text-white">
+    <footer className="mt-20 border-t border-border bg-card text-card-foreground">
       <div className="shop-container py-16">
         <div className="grid gap-12 md:grid-cols-4">
           <div>
             <div className="flex items-center gap-2.5">
-              <span className="grid h-9 w-9 place-items-center rounded-2xl bg-[#ff6b5a] font-display text-lg font-bold text-white">
+              <span className="grid h-9 w-9 place-items-center rounded-2xl bg-accent font-display text-lg font-bold text-accent-foreground">
                 S
               </span>
-              <span className="font-display text-lg font-bold text-white">QuickShop</span>
+              <span className="font-display text-lg font-bold text-card-foreground">QuickShop</span>
             </div>
-            <p className="mt-4 max-w-xs text-sm leading-6 text-white/65">
+            <p className="mt-4 max-w-xs text-sm leading-6 text-card-foreground/65">
               Everything you need, all in one place. Fast shipping, easy returns.
             </p>
           </div>

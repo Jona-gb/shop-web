@@ -11,7 +11,7 @@ export function ProductCard({ product }: { product: Product }) {
   return (
     <>
       <div className="group">
-        <div className="relative aspect-square overflow-hidden rounded-3xl border border-[#e5e7eb] bg-white shadow-[0_18px_45px_rgba(15,23,42,0.05)] transition duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_24px_60px_rgba(15,23,42,0.09)]">
+        <div className="relative aspect-square overflow-hidden rounded-3xl border border-border bg-card shadow-[0_18px_45px_rgba(15,23,42,0.05)] transition duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_24px_60px_rgba(15,23,42,0.09)]">
           <Link to="/products/$id" params={{ id: product.id }} className="block h-full w-full">
             <img
               src={product.image}
@@ -21,7 +21,7 @@ export function ProductCard({ product }: { product: Product }) {
             />
           </Link>
           {product.isNew && (
-            <span className="absolute left-4 top-4 rounded-full bg-[#ff6b5a] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white">
+            <span className="absolute left-4 top-4 rounded-full bg-accent px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-accent-foreground">
               New
             </span>
           )}
@@ -31,7 +31,7 @@ export function ProductCard({ product }: { product: Product }) {
                 e.stopPropagation();
                 setQuickOpen(true);
               }}
-              className="translate-y-4 rounded-full bg-white px-5 py-2.5 text-xs font-semibold text-[#111827] opacity-0 shadow-xl transition-all duration-300 hover:bg-[#2563eb] hover:text-white group-hover:translate-y-0 group-hover:opacity-100"
+              className="translate-y-4 rounded-full bg-card px-5 py-2.5 text-xs font-semibold text-foreground opacity-0 shadow-xl transition-all duration-300 hover:bg-primary hover:text-primary-foreground group-hover:translate-y-0 group-hover:opacity-100"
             >
               <span className="flex items-center gap-1.5">
                 <Eye className="h-4 w-4" /> View details
@@ -42,12 +42,12 @@ export function ProductCard({ product }: { product: Product }) {
 
         <Link to="/products/$id" params={{ id: product.id }} className="flex items-start justify-between gap-3 px-2 py-4">
           <div className="min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7d776e]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               {categoryName(product.category)}
             </p>
-            <h3 className="mt-1 truncate text-sm font-semibold text-[#111827] group-hover:text-[#2563eb]">{product.name}</h3>
+            <h3 className="mt-1 truncate text-sm font-semibold text-foreground group-hover:text-primary">{product.name}</h3>
           </div>
-          <p className="shrink-0 text-sm font-semibold text-[#111827]">{formatPrice(product.price)}</p>
+          <p className="shrink-0 text-sm font-semibold text-foreground">{formatPrice(product.price)}</p>
         </Link>
       </div>
 

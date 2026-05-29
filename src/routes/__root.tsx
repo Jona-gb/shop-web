@@ -91,7 +91,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head><HeadContent /></head>
-      <body>
+      <body className="bg-background text-foreground transition-colors duration-200">
         {children}
         <Scripts />
       </body>
