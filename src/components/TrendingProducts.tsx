@@ -18,11 +18,16 @@ export function TrendingProducts({
 }: TrendingProductsProps) {
   const [activeTab, setActiveTab] = useState("all");
 
+  const safeAllProducts = allProducts ?? [];
+  const safeNewProducts = newProducts ?? [];
+  const safeBestSellers = bestSellers ?? [];
+  const safeFeatured = featured ?? [];
+
   const tabData = {
-    all: allProducts.slice(0, 8),
-    new: newProducts.slice(0, 8),
-    trending: bestSellers.slice(0, 8),
-    featured: featured.slice(0, 8),
+    all: safeAllProducts.slice(0, 8),
+    new: safeNewProducts.slice(0, 8),
+    trending: safeBestSellers.slice(0, 8),
+    featured: safeFeatured.slice(0, 8),
   };
 
   return (

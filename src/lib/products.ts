@@ -90,16 +90,43 @@ export async function fetchCategories(): Promise<Category[]> {
   return fetchApi<Category[]>('/api/categories');
 }
 
-export async function fetchProducts(category?: string, q?: string): Promise<Product[]> {
+export type HomePageData = {
+  featured: Product[];
+  newArrivals: Product[];
+  categoryStats: Array<{ slug: string; name: string; count: number }>;
+};
+
+export async function fetchProducts(category?: string, q?: string, limit?: number): Promise<Product[]> {
   if (import.meta.env.SSR) {
     const { getProducts } = await import("@/lib/db");
-    return getProducts(category, q);
+    return getProducts(category, q, limit);
   }
 
   const url = new URL('/api/products', window.location.href);
   if (category) url.searchParams.set('category', category);
   if (q) url.searchParams.set('q', q);
+  if (limit) url.searchParams.set('limit', String(limit));
   return fetchApi<Product[]>(url.toString());
+}
+
+export async function fetchProductsByIds(ids: string[]): Promise<Product[]> {
+  if (ids.length === 0) return [];
+  if (import.meta.env.SSR) {
+    const { getProductsByIds } = await import("@/lib/db");
+    return getProductsByIds(ids);
+  }
+
+  const url = new URL('/api/products/ids', window.location.href);
+  ids.forEach((id) => url.searchParams.append('id', id));
+  return fetchApi<Product[]>(url.toString());
+}
+
+export async function fetchHomeProducts(): Promise<HomePageData> {
+  if (import.meta.env.SSR) {
+    const { getHomePageProducts } = await import("@/lib/db");
+    return getHomePageProducts();
+  }
+  return fetchApi<HomePageData>("/api/products/home");
 }
 
 export async function fetchProduct(id: string): Promise<Product | null> {
@@ -157,6 +184,19 @@ export function fetchCreateProduct(product: Product): Promise<Product> {
   });
 }
 
+export async function fetchRelatedProducts(category: string, excludeId: string, limit = 4): Promise<Product[]> {
+  if (import.meta.env.SSR) {
+    const { getRelatedProducts } = await import("@/lib/db");
+    return getRelatedProducts(category, excludeId, limit);
+  }
+
+  const url = new URL("/api/products/related", window.location.href);
+  url.searchParams.set("category", category);
+  url.searchParams.set("excludeId", excludeId);
+  url.searchParams.set("limit", String(limit));
+  return fetchApi<Product[]>(url.toString());
+}
+
 export async function fetchOrders(): Promise<OrderRecord[]> {
   if (import.meta.env.SSR) {
     const { getOrders } = await import("@/lib/db");
@@ -206,13 +246,43 @@ export function useApiCategories() {
   });
 }
 
-export function useApiProducts(category?: string, q?: string) {
+export function useApiProducts(category?: string, q?: string, limit?: number) {
   return useQuery({
-    queryKey: ["products", category ?? "", q ?? ""],
-    queryFn: () => fetchProducts(category, q),
+    queryKey: ["products", category ?? "", q ?? "", limit ?? 0],
+    queryFn: () => fetchProducts(category, q, limit),
     staleTime: 1000 * 60 * 2,
     initialData: [] as Product[],
     enabled: true,
+  });
+}
+
+export function useApiProductsByIds(ids: string[]) {
+  return useQuery({
+    queryKey: ["products-by-ids", ...ids],
+    queryFn: () => fetchProductsByIds(ids),
+    staleTime: 1000 * 60 * 2,
+    initialData: [] as Product[],
+    enabled: ids.length > 0,
+  });
+}
+
+export function useApiHomeProducts() {
+  return useQuery({
+    queryKey: ["home-page-data"],
+    queryFn: fetchHomeProducts,
+    staleTime: 1000 * 60 * 5,
+    initialData: { featured: [], newArrivals: [], categoryStats: [] } as HomePageData,
+    enabled: true,
+  });
+}
+
+export function useApiRelatedProducts(category: string, excludeId: string, limit = 4) {
+  return useQuery({
+    queryKey: ["related-products", category, excludeId, limit],
+    queryFn: () => fetchRelatedProducts(category, excludeId, limit),
+    staleTime: 1000 * 60 * 5,
+    initialData: [] as Product[],
+    enabled: Boolean(category && excludeId),
   });
 }
 

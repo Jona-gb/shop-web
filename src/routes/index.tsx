@@ -22,8 +22,7 @@ import { FeaturedSection, PromotionalBanner } from "@/components/FeaturedSection
 import { HeroSection } from "@/components/HeroSection";
 import { ProductCard } from "@/components/ProductCard";
 import { TrendingProducts } from "@/components/TrendingProducts";
-import { useApiCategories, useApiProducts } from "@/lib/products";
-import { getCategoryStats, getFeaturedProducts, getNewArrivals } from "@/lib/controllers/productController";
+import { useApiHomeProducts } from "@/lib/products";
 
 const productImage = (id: string) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=80`;
@@ -41,11 +40,11 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
-  const { data: products = [] } = useApiProducts();
-  const { data: categories = [] } = useApiCategories();
-  const featured = getFeaturedProducts(products);
-  const newArrivals = getNewArrivals(products);
-  const categoryItems: Category[] = getCategoryStats(categories, products).map((category) => ({
+  const { data: homeData = { featured: [], newArrivals: [], categoryStats: [] } } = useApiHomeProducts();
+  const featured = homeData.featured;
+  const newArrivals = homeData.newArrivals;
+  const allProducts = [...featured, ...newArrivals].slice(0, 8);
+  const categoryItems: Category[] = homeData.categoryStats.map((category) => ({
     slug: category.slug,
     name: category.name,
     icon: getCategoryIcon(category.slug, category.name),
@@ -136,7 +135,7 @@ function HomePage() {
       <FeaturedSection banners={promotionalBanners} title="" />
 
       <TrendingProducts
-        allProducts={products}
+        allProducts={allProducts}
         newProducts={newArrivals}
         bestSellers={featured}
         featured={featured}

@@ -2,6 +2,8 @@ import {
   getCategories,
   getProducts,
   getProductById,
+  getProductsByIds,
+  getHomePageProducts,
   createOrder,
   createCategory,
   updateCategory,
@@ -87,7 +89,31 @@ export async function handleApiRequest(request: Request): Promise<Response> {
   }
 
   if (path === "/api/products" && request.method === "GET") {
-    return json(await getProducts(url.searchParams.get("category") ?? undefined, url.searchParams.get("q") ?? undefined));
+    const limitValue = url.searchParams.get("limit");
+    return json(await getProducts(
+      url.searchParams.get("category") ?? undefined,
+      url.searchParams.get("q") ?? undefined,
+      limitValue ? Number(limitValue) : undefined,
+    ));
+  }
+
+  if (path === "/api/products/home" && request.method === "GET") {
+    return json(await getHomePageProducts());
+  }
+
+  if (path === "/api/products/ids" && request.method === "GET") {
+    const ids = url.searchParams.getAll("id");
+    return json(await getProductsByIds(ids));
+  }
+
+  if (path === "/api/products/related" && request.method === "GET") {
+    const category = url.searchParams.get("category");
+    const excludeId = url.searchParams.get("excludeId") ?? undefined;
+    const limit = Number(url.searchParams.get("limit") ?? 4);
+    if (!category) {
+      return badRequest({ error: "Category is required." });
+    }
+    return json(await getRelatedProducts(category, excludeId, limit));
   }
 
   if (path.startsWith("/api/products/") && request.method === "GET") {

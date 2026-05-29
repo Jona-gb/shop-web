@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useApiProducts } from "./products";
+import { useApiProductsByIds } from "./products";
 import {
   type CartDetail,
   type CartItem,
@@ -42,7 +42,8 @@ async function persistCartItems(items: CartItem[]) {
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
-  const { data: products = [] } = useApiProducts();
+  const productIds = items.map((item) => item.productId);
+  const { data: products = [] } = useApiProductsByIds(productIds);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

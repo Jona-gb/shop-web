@@ -75,6 +75,20 @@ async function initSchema(pool: Pool) {
       FOREIGN KEY (category) REFERENCES categories(slug)
     )`);
 
+  const [categoryIndexRows] = await pool.query<RowDataPacket[]>(
+    "SHOW INDEX FROM products WHERE Key_name = 'idx_products_category'",
+  );
+  if (((categoryIndexRows as RowDataPacket[])?.length ?? 0) === 0) {
+    await pool.query("CREATE INDEX idx_products_category ON products(category)");
+  }
+
+  const [fulltextIndexRows] = await pool.query<RowDataPacket[]>(
+    "SHOW INDEX FROM products WHERE Key_name = 'idx_products_fulltext'",
+  );
+  if (((fulltextIndexRows as RowDataPacket[])?.length ?? 0) === 0) {
+    await pool.query("CREATE FULLTEXT INDEX idx_products_fulltext ON products(name, description)");
+  }
+
   await pool.query(`CREATE TABLE IF NOT EXISTS cart_items (
       cartId VARCHAR(191) NOT NULL,
       productId VARCHAR(191) NOT NULL,
@@ -226,7 +240,7 @@ export async function clearCartItems(cartId: string): Promise<void> {
   await pool.query("DELETE FROM cart_items WHERE cartId = ?", [cartId]);
 }
 
-export async function getProducts(category?: string, q?: string): Promise<Product[]> {
+export async function getProducts(category?: string, q?: string, limit?: number): Promise<Product[]> {
   await ensureInitialized();
   const pool = await poolPromise;
 
@@ -239,16 +253,30 @@ export async function getProducts(category?: string, q?: string): Promise<Produc
   }
 
   if (q?.trim()) {
-    conditions.push("(LOWER(name) LIKE ? OR LOWER(description) LIKE ?)");
-    const search = `%${q.trim().toLowerCase()}%`;
-    params.push(search, search);
+    const search = q.trim();
+    const fulltextQuery = search
+      .split(/\s+/)
+      .map((term) => term.replace(/[^\w]+/g, ""))
+      .filter(Boolean)
+      .map((term) => `+${term}*`)
+      .join(" ");
+
+    if (fulltextQuery) {
+      conditions.push("MATCH(name, description) AGAINST(? IN BOOLEAN MODE)");
+      params.push(fulltextQuery);
+    } else {
+      conditions.push("(LOWER(name) LIKE ? OR LOWER(description) LIKE ?)");
+      const searchTerm = `%${search.toLowerCase()}%`;
+      params.push(searchTerm, searchTerm);
+    }
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT * FROM products ${whereClause} ORDER BY name`,
-    params,
-  );
+  const query = `SELECT * FROM products ${whereClause} ORDER BY name${limit ? " LIMIT ?" : ""}`;
+  if (limit) {
+    params.push(limit);
+  }
+  const [rows] = await pool.query<RowDataPacket[]>(query, params);
   const productRows = rows as ProductRow[];
 
   return productRows.map((product) => ({
@@ -272,6 +300,95 @@ export async function getProductById(id: string): Promise<Product | undefined> {
     isNew: Boolean(product.isNew),
     isFeatured: Boolean(product.isFeatured),
   };
+}
+
+export async function getProductsByIds(ids: string[]): Promise<Product[]> {
+  if (ids.length === 0) return [];
+  await ensureInitialized();
+  const pool = await poolPromise;
+  const placeholders = ids.map(() => "?").join(", ");
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT * FROM products WHERE id IN (${placeholders})`,
+    ids,
+  );
+  return (rows as ProductRow[]).map((product) => ({
+    ...product,
+    isNew: Boolean(product.isNew),
+    isFeatured: Boolean(product.isFeatured),
+  }));
+}
+
+export async function getHomePageProducts(): Promise<{
+  featured: Product[];
+  newArrivals: Product[];
+  categoryStats: Array<{ slug: string; name: string; count: number }>;
+}> {
+  await ensureInitialized();
+  const pool = await poolPromise;
+
+  const [featuredRows] = await pool.query<RowDataPacket[]>(
+    "SELECT * FROM products WHERE isFeatured = 1 ORDER BY name LIMIT 8",
+  );
+  const featured = (featuredRows as ProductRow[]).map((product) => ({
+    ...product,
+    isNew: Boolean(product.isNew),
+    isFeatured: Boolean(product.isFeatured),
+  }));
+
+  const [newRows] = await pool.query<RowDataPacket[]>(
+    "SELECT * FROM products WHERE isNew = 1 ORDER BY name LIMIT 8",
+  );
+  const newArrivals = (newRows as ProductRow[]).map((product) => ({
+    ...product,
+    isNew: Boolean(product.isNew),
+    isFeatured: Boolean(product.isFeatured),
+  }));
+
+  const [categoryStatsRows] = await pool.query<RowDataPacket[]>(
+    `SELECT category AS slug, COUNT(*) AS count FROM products GROUP BY category`,
+  );
+  const categoryStats = (categoryStatsRows as Array<{ slug: string; count: number }>).map((row) => ({
+    slug: row.slug,
+    name: row.slug,
+    count: row.count,
+  }));
+
+  const [categoryNames] = await pool.query<RowDataPacket[]>(
+    `SELECT slug, name FROM categories`,
+  );
+  const categoryMap = new Map((categoryNames as Array<{ slug: string; name: string }>).map((c) => [c.slug, c.name]));
+
+  return {
+    featured,
+    newArrivals,
+    categoryStats: categoryStats.map((stat) => ({
+      slug: stat.slug,
+      name: categoryMap.get(stat.slug) ?? stat.slug,
+      count: stat.count,
+    })),
+  };
+}
+
+export async function getRelatedProducts(category: string, excludeId: string | undefined, limit = 4): Promise<Product[]> {
+  await ensureInitialized();
+  const pool = await poolPromise;
+  const params: Array<unknown> = [category];
+  const whereClause = ["category = ?"];
+  if (excludeId) {
+    whereClause.push("id != ?");
+    params.push(excludeId);
+  }
+  params.push(limit);
+
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT * FROM products WHERE ${whereClause.join(" AND ")} ORDER BY name LIMIT ?`,
+    params,
+  );
+  return (rows as ProductRow[]).map((product) => ({
+    ...product,
+    isNew: Boolean(product.isNew),
+    isFeatured: Boolean(product.isFeatured),
+  }));
 }
 
 export async function createProduct(product: Product): Promise<Product> {

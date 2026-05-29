@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, X, Tag, Package, List, Save, Lock } from "lucide-react";
+import { Activity, Plus, Pencil, Trash2, X, Tag, Package, List, Save, Lock } from "lucide-react";
 import {
   useApiCategories,
   useApiProducts,
@@ -22,6 +22,17 @@ import {
 } from "@/lib/products";
 import { useApiUsers, promoteUser, removeUser } from "@/lib/adminClient";
 import { Users, BarChart, FileText } from "lucide-react";
+import {
+  Bar,
+  BarChart as RechartsBarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { formatPrice } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
 
@@ -60,14 +71,15 @@ function AdminGate() {
   return <AdminPage />;
 }
 
-type Tab = "products" | "categories" | "orders" | "users" | "analytics" | "receipts";
+type Tab = "overview" | "products" | "categories" | "orders" | "users" | "analytics";
 
 function AdminPage() {
   const { user } = useAuth();
-  const [tab, setTab] = useState<Tab>("products");
+  const [tab, setTab] = useState<Tab>("overview");
   const { data: products = [] } = useApiProducts();
   const { data: categories = [] } = useApiCategories();
   const { data: orders = [] } = useApiOrders();
+  const { data: users = [] } = useApiUsers();
   const queryClient = useQueryClient();
 
   return (
@@ -76,17 +88,10 @@ function AdminPage() {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-primary">Admin</p>
           <h1 className="mt-1 font-display text-3xl font-bold tracking-tight md:text-4xl">Dashboard</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage your store. Changes save instantly to the server.
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Manage your store in one place with a cleaner overview and faster access to product, order, user, and analytics tools.
           </p>
         </div>
-        {user ? (
-          <div className="rounded-2xl border border-border bg-card p-4 text-sm">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Signed in as</p>
-            <p className="mt-2 font-semibold">{user.name}</p>
-            <p className="text-xs text-muted-foreground">{user.email}</p>
-          </div>
-        ) : null}
         <div className="flex gap-2">
           <button
             onClick={async () => {
@@ -109,44 +114,46 @@ function AdminPage() {
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:max-w-none">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5 sm:max-w-none">
         <Stat label="Products" value={products.length} />
         <Stat label="Categories" value={categories.length} />
         <Stat label="Featured" value={products.filter((p) => p.isFeatured).length} />
         <Stat label="Orders" value={orders.length} />
+        <Stat label="Users" value={users.length} />
       </div>
 
-      <div className="mt-8 grid grid-cols-[220px_1fr] gap-6">
-        <aside className="rounded-2xl border border-border bg-card p-4">
+      <div className="mt-8 grid gap-6 lg:grid-cols-[280px_1fr]">
+        <aside className="sticky top-6 rounded-2xl border border-border bg-card p-4">
           <div className="mb-4">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Admin</p>
-            <p className="mt-2 font-semibold">{user?.name}</p>
-            <p className="text-xs text-muted-foreground">{user?.email}</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Dashboard</p>
+            <p className="mt-2 font-semibold">Sections</p>
           </div>
           <nav className="flex flex-col gap-1">
-            <button onClick={() => setTab("products")} className={"inline-flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm " + (tab === "products" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/20")}>
-              <Package className="h-4 w-4" /> Products
-            </button>
-            <button onClick={() => setTab("categories")} className={"inline-flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm " + (tab === "categories" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/20")}>
-              <Tag className="h-4 w-4" /> Categories
-            </button>
-            <button onClick={() => setTab("orders")} className={"inline-flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm " + (tab === "orders" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/20")}>
-              <List className="h-4 w-4" /> Orders
-            </button>
-            <button onClick={() => setTab("users")} className={"inline-flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm " + (tab === "users" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/20")}>
-              <Users className="h-4 w-4" /> Users
-            </button>
-            <button onClick={() => setTab("analytics")} className={"inline-flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm " + (tab === "analytics" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/20")}>
-              <BarChart className="h-4 w-4" /> Analytics
-            </button>
-            <button onClick={() => setTab("receipts")} className={"inline-flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm " + (tab === "receipts" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/20")}>
-              <FileText className="h-4 w-4" /> Receipts
-            </button>
+            <TabBtn active={tab === "overview"} onClick={() => setTab("overview")} icon={<Activity className="h-4 w-4" />}>
+              Overview
+            </TabBtn>
+            <TabBtn active={tab === "products"} onClick={() => setTab("products")} icon={<Package className="h-4 w-4" />}>
+              Products
+            </TabBtn>
+            <TabBtn active={tab === "categories"} onClick={() => setTab("categories")} icon={<Tag className="h-4 w-4" />}>
+              Categories
+            </TabBtn>
+            <TabBtn active={tab === "orders"} onClick={() => setTab("orders")} icon={<List className="h-4 w-4" />}>
+              Orders
+            </TabBtn>
+            <TabBtn active={tab === "users"} onClick={() => setTab("users")} icon={<Users className="h-4 w-4" />}>
+              Users
+            </TabBtn>
+            <TabBtn active={tab === "analytics"} onClick={() => setTab("analytics")} icon={<BarChart className="h-4 w-4" />}>
+              Analytics
+            </TabBtn>
           </nav>
         </aside>
 
         <main>
-          {tab === "products" ? (
+          {tab === "overview" ? (
+            <OverviewTab orders={orders} products={products} users={users} />
+          ) : tab === "products" ? (
             <ProductsTab products={products} categories={categories} />
           ) : tab === "categories" ? (
             <CategoriesTab categories={categories} products={products} />
@@ -155,7 +162,7 @@ function AdminPage() {
           ) : tab === "users" ? (
             <UsersTab />
           ) : (
-            <AnalyticsTab orders={orders} products={products} />
+            <AnalyticsTab orders={orders} products={products} users={users} />
           )}
         </main>
       </div>
@@ -163,7 +170,7 @@ function AdminPage() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <p className="text-xs text-muted-foreground">{label}</p>
@@ -504,33 +511,367 @@ function UsersTab() {
   );
 }
 
-function AnalyticsTab({ orders, products }: { orders: OrderRecord[]; products: Product[] }) {
+function OverviewTab({ orders, products, users }: { orders: OrderRecord[]; products: Product[]; users: { email: string }[] }) {
+  const totalRevenue = orders.reduce((sum, order) => sum + (order.total || 0), 0);
+  const totalOrders = orders.length;
+  const totalProducts = products.length;
+  const totalUsers = users.length;
+  const revenueByDay = buildRevenueSeries(orders, "day", 7);
+  const topCategories = buildCategoryStats(products, 4);
+  const recentOrders = [...orders]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 4);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-4">
+        <Stat label="Revenue" value={formatPrice(Number(totalRevenue.toFixed(0)))} />
+        <Stat label="Orders" value={totalOrders} />
+        <Stat label="Products" value={totalProducts} />
+        <Stat label="Users" value={totalUsers} />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1.6fr_0.9fr]">
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Revenue last 7 days</p>
+              <h2 className="mt-2 text-2xl font-semibold">Store performance</h2>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-border bg-muted p-4 text-center">
+                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Orders</p>
+                <p className="mt-2 text-xl font-semibold">{totalOrders}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-muted p-4 text-center">
+                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Revenue</p>
+                <p className="mt-2 text-xl font-semibold">{formatPrice(Number(totalRevenue.toFixed(0)))}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-muted p-4 text-center">
+                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Products</p>
+                <p className="mt-2 text-xl font-semibold">{totalProducts}</p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-6 h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={revenueByDay} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                <Tooltip formatter={(value) => [formatPrice(Number(value)), "Revenue"]} />
+                <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={3} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-semibold">Top categories</h3>
+                <p className="mt-1 text-xs text-muted-foreground">Most stocked categories</p>
+              </div>
+              <span className="rounded-full bg-muted px-2 py-1 text-[11px] uppercase tracking-[0.15em] text-muted-foreground">Catalog</span>
+            </div>
+            <div className="mt-5 space-y-4">
+              {topCategories.map((category) => (
+                <div key={category.slug} className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3">
+                  <div>
+                    <p className="font-medium">{category.slug}</p>
+                    <p className="text-xs text-muted-foreground">{category.count} products</p>
+                  </div>
+                  <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Top</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-semibold">Recent orders</h3>
+                <p className="mt-1 text-xs text-muted-foreground">Latest customer activity</p>
+              </div>
+              <span className="rounded-full bg-muted px-2 py-1 text-[11px] uppercase tracking-[0.15em] text-muted-foreground">Live</span>
+            </div>
+            <div className="mt-5 space-y-3">
+              {recentOrders.map((order) => (
+                <div key={order.id} className="rounded-2xl border border-border bg-surface p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{order.orderNumber}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(order.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    <p className="text-sm font-semibold">{formatPrice(order.total || 0)}</p>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">{order.name} · {order.email}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function buildOrderSeries(orders: OrderRecord[], period: "day" | "month" | "year", length: number) {
+  const countMap = new Map<string, number>();
+  orders.forEach((order) => {
+    const date = new Date(order.createdAt);
+    if (Number.isNaN(date.getTime())) return;
+
+    const key =
+      period === "day"
+        ? `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
+        : period === "month"
+        ? `${date.getFullYear()}-${date.getMonth() + 1}`
+        : `${date.getFullYear()}`;
+    countMap.set(key, (countMap.get(key) ?? 0) + 1);
+  });
+
+  const now = new Date();
+  const series = [] as { label: string; value: number }[];
+
+  for (let index = length - 1; index >= 0; index--) {
+    const date = new Date(now);
+    if (period === "day") {
+      date.setDate(now.getDate() - index);
+    } else if (period === "month") {
+      date.setMonth(now.getMonth() - index);
+      date.setDate(1);
+    } else {
+      date.setFullYear(now.getFullYear() - index);
+      date.setMonth(0);
+      date.setDate(1);
+    }
+
+    const key =
+      period === "day"
+        ? `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
+        : period === "month"
+        ? `${date.getFullYear()}-${date.getMonth() + 1}`
+        : `${date.getFullYear()}`;
+
+    const label =
+      period === "day"
+        ? date.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+        : period === "month"
+        ? date.toLocaleDateString(undefined, { month: "short", year: "numeric" })
+        : date.getFullYear().toString();
+
+    series.push({ label, value: countMap.get(key) ?? 0 });
+  }
+
+  return series;
+}
+
+function buildRevenueSeries(orders: OrderRecord[], period: "day" | "month" | "year", length: number) {
+  const revenueMap = new Map<string, number>();
+  orders.forEach((order) => {
+    const date = new Date(order.createdAt);
+    if (Number.isNaN(date.getTime())) return;
+
+    const key =
+      period === "day"
+        ? `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
+        : period === "month"
+        ? `${date.getFullYear()}-${date.getMonth() + 1}`
+        : `${date.getFullYear()}`;
+    revenueMap.set(key, (revenueMap.get(key) ?? 0) + (order.total || 0));
+  });
+
+  const now = new Date();
+  const series = [] as { label: string; value: number }[];
+
+  for (let index = length - 1; index >= 0; index--) {
+    const date = new Date(now);
+    if (period === "day") {
+      date.setDate(now.getDate() - index);
+    } else if (period === "month") {
+      date.setMonth(now.getMonth() - index);
+      date.setDate(1);
+    } else {
+      date.setFullYear(now.getFullYear() - index);
+      date.setMonth(0);
+      date.setDate(1);
+    }
+
+    const key =
+      period === "day"
+        ? `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
+        : period === "month"
+        ? `${date.getFullYear()}-${date.getMonth() + 1}`
+        : `${date.getFullYear()}`;
+
+    const label =
+      period === "day"
+        ? date.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+        : period === "month"
+        ? date.toLocaleDateString(undefined, { month: "short", year: "numeric" })
+        : date.getFullYear().toString();
+
+    series.push({ label, value: revenueMap.get(key) ?? 0 });
+  }
+
+  return series;
+}
+
+function buildCategoryStats(products: Product[], limit: number) {
+  const counts = new Map<string, number>();
+  products.forEach((product) => {
+    counts.set(product.category, (counts.get(product.category) ?? 0) + 1);
+  });
+
+  return Array.from(counts.entries())
+    .map(([slug, count]) => ({ slug, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit);
+}
+
+function AnalyticsTab({ orders, products, users }: { orders: OrderRecord[]; products: Product[]; users: { email: string }[] }) {
   const totalRevenue = orders.reduce((s, o) => s + (o.total || 0), 0);
   const avgOrder = orders.length ? totalRevenue / orders.length : 0;
   const totalOrders = orders.length;
   const totalProducts = products.length;
+  const totalUsers = users.length;
+  const ordersByDay = buildOrderSeries(orders, "day", 7);
+  const revenueByDay = buildRevenueSeries(orders, "day", 7);
+  const ordersByMonth = buildOrderSeries(orders, "month", 6);
+  const revenueByMonth = buildRevenueSeries(orders, "month", 6);
+  const topCategories = buildCategoryStats(products, 4);
+  const recentOrders = [...orders]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5);
 
   return (
-    <div>
-      <div className="grid grid-cols-3 gap-3 sm:max-w-md">
-        <Stat label="Total revenue" value={Number(totalRevenue.toFixed(0))} />
-        <Stat label="Avg order" value={Number(avgOrder.toFixed(0))} />
-        <Stat label="Orders" value={totalOrders} />
+    <div className="space-y-6">
+      <div className="grid gap-6 xl:grid-cols-[1.75fr_1fr]">
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Revenue overview</p>
+              <h2 className="mt-2 text-3xl font-semibold">Sales performance</h2>
+              <p className="mt-2 text-sm text-muted-foreground">Track revenue, orders, and product activity in one view.</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-border bg-muted p-4 text-center">
+                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Revenue</p>
+                <p className="mt-2 text-xl font-semibold">{formatPrice(Number(totalRevenue.toFixed(0)))}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-muted p-4 text-center">
+                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Orders</p>
+                <p className="mt-2 text-xl font-semibold">{totalOrders}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-muted p-4 text-center">
+                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Avg order</p>
+                <p className="mt-2 text-xl font-semibold">{formatPrice(Number(avgOrder.toFixed(0)))}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={revenueByDay} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                <Tooltip formatter={(value) => [formatPrice(Number(value)), "Revenue"]} />
+                <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={3} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-semibold">Top categories</h3>
+                <p className="mt-1 text-xs text-muted-foreground">Products per category</p>
+              </div>
+              <span className="rounded-full bg-muted px-2 py-1 text-[11px] uppercase tracking-[0.15em] text-muted-foreground">Catalog</span>
+            </div>
+            <div className="mt-5 space-y-4">
+              {topCategories.map((category) => (
+                <div key={category.slug} className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3">
+                  <div>
+                    <p className="font-medium">{category.slug}</p>
+                    <p className="text-xs text-muted-foreground">{category.count} products</p>
+                  </div>
+                  <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Top</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-semibold">User growth</h3>
+                <p className="mt-1 text-xs text-muted-foreground">Active users and signup trends</p>
+              </div>
+              <span className="rounded-full bg-muted px-2 py-1 text-[11px] uppercase tracking-[0.15em] text-muted-foreground">Live</span>
+            </div>
+            <div className="mt-5 space-y-3">
+              <div className="rounded-2xl border border-border bg-surface p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Total users</p>
+                <p className="mt-2 text-2xl font-semibold">{totalUsers}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-surface p-4">
+                <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">New orders in 7d</p>
+                <p className="mt-2 text-2xl font-semibold">{ordersByDay.reduce((sum, point) => sum + point.value, 0)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="mt-6">
-        <div className="rounded-2xl border border-border bg-card p-6">
-          <h3 className="font-semibold">Overview</h3>
-          <p className="mt-2 text-sm text-muted-foreground">Quick store metrics and recent trends.</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-border bg-muted p-4">
-              <p className="text-xs text-muted-foreground">Products</p>
-              <p className="mt-1 font-display text-xl font-bold">{totalProducts}</p>
+      <div className="grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-semibold">Revenue by month</h3>
+              <p className="mt-1 text-xs text-muted-foreground">Last 6 months</p>
             </div>
-            <div className="rounded-lg border border-border bg-muted p-4">
-              <p className="text-xs text-muted-foreground">Revenue</p>
-              <p className="mt-1 font-display text-xl font-bold">{formatPrice(totalRevenue)}</p>
+            <span className="rounded-full bg-muted px-2 py-1 text-[11px] uppercase tracking-[0.15em] text-muted-foreground">Monthly</span>
+          </div>
+          <div className="mt-5 h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <RechartsBarChart data={revenueByMonth} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                <Tooltip formatter={(value) => [formatPrice(Number(value)), "Revenue"]} />
+                <Bar dataKey="value" fill="#6366f1" radius={[4, 4, 0, 0]} />
+              </RechartsBarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-semibold">Recent orders</h3>
+              <p className="mt-1 text-xs text-muted-foreground">Latest customer activity</p>
             </div>
+            <span className="rounded-full bg-muted px-2 py-1 text-[11px] uppercase tracking-[0.15em] text-muted-foreground">Live</span>
+          </div>
+          <div className="mt-5 space-y-3">
+            {recentOrders.map((order) => (
+              <div key={order.id} className="rounded-2xl border border-border bg-surface p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{order.orderNumber}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(order.createdAt).toLocaleDateString()}</p>
+                  </div>
+                  <p className="text-sm font-semibold">{formatPrice(order.total || 0)}</p>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">{order.name} · {order.email}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
