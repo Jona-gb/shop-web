@@ -1,15 +1,22 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
 import { Minus, Plus, ArrowLeft, Truck, RotateCcw, ShieldCheck } from "lucide-react";
-import { getProduct, useProducts, categoryName } from "@/lib/products";
+import { useApiProducts, categoryName, type Product } from "@/lib/products";
 import { formatPrice, useCart } from "@/lib/cart";
 import { ProductCard } from "@/components/ProductCard";
 
 export const Route = createFileRoute("/products/$id")({
-  loader: ({ params }) => {
-    const p = getProduct(params.id);
-    if (!p) throw notFound();
-    return p;
+  loader: async ({ params }) => {
+    if (import.meta.env.SSR) {
+      const { getProductById } = await import("@/lib/db");
+      const product = await getProductById(params.id);
+      if (!product) throw notFound();
+      return product;
+    }
+    const response = await fetch('/api/products/' + encodeURIComponent(params.id));
+    if (response.status === 404) throw notFound();
+    if (!response.ok) throw new Error("Failed to load product");
+    return (await response.json()) as Product;
   },
   head: ({ loaderData }) => ({
     meta: loaderData
@@ -35,8 +42,8 @@ export const Route = createFileRoute("/products/$id")({
 });
 
 function ProductPage() {
-  const product = Route.useLoaderData();
-  const products = useProducts();
+  const product = Route.useLoaderData() as Product;
+  const { data: products = [] } = useApiProducts();
   const { add } = useCart();
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);

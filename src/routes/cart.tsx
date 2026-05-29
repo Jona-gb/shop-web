@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Minus, Plus, X, ShoppingBag } from "lucide-react";
 import { formatPrice, useCart } from "@/lib/cart";
 import { categoryName } from "@/lib/products";
+import { getShippingCost, getOrderTotal } from "@/lib/controllers/checkoutController";
 
 export const Route = createFileRoute("/cart")({
   head: () => ({ meta: [{ title: "Cart — ShopEase" }] }),
@@ -10,8 +11,8 @@ export const Route = createFileRoute("/cart")({
 
 function CartPage() {
   const { detailed, subtotal, setQty, remove } = useCart();
-  const shipping = subtotal > 50 || subtotal === 0 ? 0 : 5;
-  const total = subtotal + shipping;
+  const shipping = getShippingCost(subtotal);
+  const total = getOrderTotal(subtotal);
 
   if (detailed.length === 0) {
     return (

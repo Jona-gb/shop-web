@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Search } from "lucide-react";
-import { useCategories, useProducts, categoryName } from "@/lib/products";
+import { useApiCategories, useApiProducts, categoryName } from "@/lib/products";
 import { ProductCard } from "@/components/ProductCard";
 
 type SearchParams = { category?: string; q?: string };
@@ -23,17 +23,19 @@ export const Route = createFileRoute("/products")({
 function ProductsPage() {
   const { category, q } = Route.useSearch();
   const navigate = Route.useNavigate();
-  const products = useProducts();
-  const categories = useCategories();
   const [query, setQuery] = useState(q ?? "");
+  const {
+    data: products = [],
+    isLoading: productsLoading,
+    isError: productsError,
+  } = useApiProducts(category, q);
+  const {
+    data: categories = [],
+    isLoading: categoriesLoading,
+    isError: categoriesError,
+  } = useApiCategories();
 
-  const filtered = useMemo(() => {
-    return products.filter((p) => {
-      if (category && p.category !== category) return false;
-      if (q && !p.name.toLowerCase().includes(q.toLowerCase())) return false;
-      return true;
-    });
-  }, [category, q, products]);
+  const filtered = products;
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -74,7 +76,21 @@ function ProductsPage() {
         ))}
       </div>
 
-      {filtered.length === 0 ? (
+      {(productsLoading || categoriesLoading) && (
+        <div className="mt-24 text-center">
+          <p className="font-display text-xl font-semibold">Loading products�</p>
+          <p className="mt-2 text-sm text-muted-foreground">Please wait while we load the latest items.</p>
+        </div>
+      )}
+
+      {(productsError || categoriesError) && (
+        <div className="mt-24 text-center text-destructive">
+          <p className="font-display text-xl font-semibold">Unable to load products</p>
+          <p className="mt-2 text-sm text-muted-foreground">Try refreshing the page.</p>
+        </div>
+      )}
+
+      {!productsLoading && !categoriesLoading && !productsError && !categoriesError && filtered.length === 0 ? (
         <div className="mt-24 text-center">
           <p className="font-display text-xl font-semibold">No products found</p>
           <p className="mt-2 text-sm text-muted-foreground">Try a different search or category.</p>

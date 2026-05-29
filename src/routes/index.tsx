@@ -22,7 +22,8 @@ import { FeaturedSection, PromotionalBanner } from "@/components/FeaturedSection
 import { HeroSection } from "@/components/HeroSection";
 import { ProductCard } from "@/components/ProductCard";
 import { TrendingProducts } from "@/components/TrendingProducts";
-import { useCategories, useProducts } from "@/lib/products";
+import { useApiCategories, useApiProducts } from "@/lib/products";
+import { getCategoryStats, getFeaturedProducts, getNewArrivals } from "@/lib/controllers/productController";
 
 const productImage = (id: string) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=80`;
@@ -40,16 +41,15 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
-  const products = useProducts();
-  const categories = useCategories();
-  const featured = products.filter((p) => p.isFeatured).slice(0, 8);
-  const newArrivals = products.filter((p) => p.isNew).slice(0, 8);
-
-  const categoryItems: Category[] = categories.map((category) => ({
+  const { data: products = [] } = useApiProducts();
+  const { data: categories = [] } = useApiCategories();
+  const featured = getFeaturedProducts(products);
+  const newArrivals = getNewArrivals(products);
+  const categoryItems: Category[] = getCategoryStats(categories, products).map((category) => ({
     slug: category.slug,
     name: category.name,
     icon: getCategoryIcon(category.slug, category.name),
-    count: products.filter((product) => product.category === category.slug).length,
+    count: category.count,
   }));
 
   const promotionalBanners: PromotionalBanner[] = [

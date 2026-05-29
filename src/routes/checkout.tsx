@@ -1,15 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { z } from "zod";
 import { formatPrice, useCart } from "@/lib/cart";
-
-const schema = z.object({
-  name: z.string().trim().min(2, "Required").max(100),
-  phone: z.string().trim().min(6, "Required").max(30),
-  email: z.string().trim().email("Invalid email").max(255),
-  address: z.string().trim().min(6, "Required").max(500),
-  payment: z.enum(["cod", "mobile"]),
-});
+import {
+  checkoutSchema,
+  createOrderNumber,
+  getOrderTotal,
+  getShippingCost,
+  parseCheckoutErrors,
+} from "@/lib/controllers/checkoutController";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({ meta: [{ title: "Checkout — ShopEase" }] }),
@@ -19,8 +17,8 @@ export const Route = createFileRoute("/checkout")({
 function CheckoutPage() {
   const { detailed, subtotal, clear } = useCart();
   const navigate = useNavigate();
-  const shipping = subtotal > 50 || subtotal === 0 ? 0 : 5;
-  const total = subtotal + shipping;
+  const shipping = getShippingCost(subtotal);
+  const total = getOrderTotal(subtotal);
 
   const [form, setForm] = useState({ name: "", phone: "", email: "", address: "", payment: "cod" as "cod" | "mobile" });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -38,25 +36,44 @@ function CheckoutPage() {
     setForm((f) => ({ ...f, [k]: v }));
   }
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const parsed = schema.safeParse(form);
+    const parsed = checkoutSchema.safeParse(form);
     if (!parsed.success) {
-      const errs: Record<string, string> = {};
-      parsed.error.issues.forEach((i) => { errs[String(i.path[0])] = i.message; });
-      setErrors(errs);
+      setErrors(parseCheckoutErrors(parsed));
       return;
     }
     setErrors({});
     setSubmitting(true);
-    const orderNumber = "SE-" + Date.now().toString(36).toUpperCase().slice(-8);
-    setTimeout(() => {
-      clear();
-      navigate({
-        to: "/order-confirmation",
-        search: { order: orderNumber, name: form.name, payment: form.payment, total },
-      });
-    }, 500);
+
+    const payload = {
+      ...form,
+      items: detailed.map(({ product, qty }) => ({ productId: product.id, qty })),
+    };
+
+    const response = await fetch("/api/checkout", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json().catch(() => null);
+    setSubmitting(false);
+
+    if (!response.ok) {
+      if (data?.errors) {
+        setErrors(data.errors);
+        return;
+      }
+      setErrors({ form: "Could not complete order. Try again." });
+      return;
+    }
+
+    clear();
+    navigate({
+      to: "/order-confirmation",
+      search: { order: data.orderNumber, name: form.name, payment: form.payment, total: data.total },
+    });
   }
 
   return (

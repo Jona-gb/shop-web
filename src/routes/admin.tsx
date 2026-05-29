@@ -1,19 +1,27 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { Plus, Pencil, Trash2, X, Tag, Package, Save, Lock } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Plus, Pencil, Trash2, X, Tag, Package, List, Save, Lock } from "lucide-react";
 import {
-  useCategories,
-  useProducts,
-  saveCategories,
-  saveProducts,
-  seedCategories,
-  seedProducts,
+  useApiCategories,
+  useApiProducts,
+  useApiOrders,
+  fetchCreateCategory,
+  fetchUpdateCategory,
+  fetchDeleteCategory,
+  fetchCreateProduct,
+  fetchUpdateProduct,
+  fetchDeleteProduct,
+  fetchResetStore,
   newId,
   slugify,
   categoryName,
   type Category,
   type Product,
+  type OrderRecord,
 } from "@/lib/products";
+import { useApiUsers, promoteUser, removeUser } from "@/lib/adminClient";
+import { Users, BarChart, FileText } from "lucide-react";
 import { formatPrice } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
 
@@ -52,12 +60,15 @@ function AdminGate() {
   return <AdminPage />;
 }
 
-type Tab = "products" | "categories";
+type Tab = "products" | "categories" | "orders" | "users" | "analytics" | "receipts";
 
 function AdminPage() {
+  const { user } = useAuth();
   const [tab, setTab] = useState<Tab>("products");
-  const products = useProducts();
-  const categories = useCategories();
+  const { data: products = [] } = useApiProducts();
+  const { data: categories = [] } = useApiCategories();
+  const { data: orders = [] } = useApiOrders();
+  const queryClient = useQueryClient();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
@@ -66,15 +77,26 @@ function AdminPage() {
           <p className="text-xs font-semibold uppercase tracking-wider text-primary">Admin</p>
           <h1 className="mt-1 font-display text-3xl font-bold tracking-tight md:text-4xl">Dashboard</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage your store. Changes save instantly to this browser.
+            Manage your store. Changes save instantly to the server.
           </p>
         </div>
+        {user ? (
+          <div className="rounded-2xl border border-border bg-card p-4 text-sm">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Signed in as</p>
+            <p className="mt-2 font-semibold">{user.name}</p>
+            <p className="text-xs text-muted-foreground">{user.email}</p>
+          </div>
+        ) : null}
         <div className="flex gap-2">
           <button
-            onClick={() => {
-              if (confirm("Reset all products and categories to defaults?")) {
-                saveCategories(seedCategories);
-                saveProducts(seedProducts);
+            onClick={async () => {
+              if (!confirm("Reset all products and categories to defaults?")) return;
+              try {
+                await fetchResetStore();
+                queryClient.invalidateQueries(["categories"]);
+                queryClient.invalidateQueries(["products"]);
+              } catch (error) {
+                alert(error instanceof Error ? error.message : String(error));
               }
             }}
             className="rounded-full border border-border bg-card px-4 py-2 text-xs font-medium hover:border-destructive hover:text-destructive"
@@ -87,23 +109,55 @@ function AdminPage() {
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-3 gap-3 sm:max-w-md">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:max-w-none">
         <Stat label="Products" value={products.length} />
         <Stat label="Categories" value={categories.length} />
         <Stat label="Featured" value={products.filter((p) => p.isFeatured).length} />
+        <Stat label="Orders" value={orders.length} />
       </div>
 
-      <div className="mt-8 flex gap-2 border-b border-border">
-        <TabBtn active={tab === "products"} onClick={() => setTab("products")} icon={<Package className="h-4 w-4" />}>
-          Products
-        </TabBtn>
-        <TabBtn active={tab === "categories"} onClick={() => setTab("categories")} icon={<Tag className="h-4 w-4" />}>
-          Categories
-        </TabBtn>
-      </div>
+      <div className="mt-8 grid grid-cols-[220px_1fr] gap-6">
+        <aside className="rounded-2xl border border-border bg-card p-4">
+          <div className="mb-4">
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Admin</p>
+            <p className="mt-2 font-semibold">{user?.name}</p>
+            <p className="text-xs text-muted-foreground">{user?.email}</p>
+          </div>
+          <nav className="flex flex-col gap-1">
+            <button onClick={() => setTab("products")} className={"inline-flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm " + (tab === "products" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/20")}>
+              <Package className="h-4 w-4" /> Products
+            </button>
+            <button onClick={() => setTab("categories")} className={"inline-flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm " + (tab === "categories" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/20")}>
+              <Tag className="h-4 w-4" /> Categories
+            </button>
+            <button onClick={() => setTab("orders")} className={"inline-flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm " + (tab === "orders" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/20")}>
+              <List className="h-4 w-4" /> Orders
+            </button>
+            <button onClick={() => setTab("users")} className={"inline-flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm " + (tab === "users" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/20")}>
+              <Users className="h-4 w-4" /> Users
+            </button>
+            <button onClick={() => setTab("analytics")} className={"inline-flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm " + (tab === "analytics" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/20")}>
+              <BarChart className="h-4 w-4" /> Analytics
+            </button>
+            <button onClick={() => setTab("receipts")} className={"inline-flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm " + (tab === "receipts" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/20")}>
+              <FileText className="h-4 w-4" /> Receipts
+            </button>
+          </nav>
+        </aside>
 
-      <div className="mt-8">
-        {tab === "products" ? <ProductsTab products={products} categories={categories} /> : <CategoriesTab categories={categories} products={products} />}
+        <main>
+          {tab === "products" ? (
+            <ProductsTab products={products} categories={categories} />
+          ) : tab === "categories" ? (
+            <CategoriesTab categories={categories} products={products} />
+          ) : tab === "orders" ? (
+            <OrdersTab orders={orders} />
+          ) : tab === "users" ? (
+            <UsersTab />
+          ) : (
+            <AnalyticsTab orders={orders} products={products} />
+          )}
+        </main>
       </div>
     </div>
   );
@@ -139,8 +193,9 @@ function CategoriesTab({ categories, products }: { categories: Category[]; produ
   const [name, setName] = useState("");
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const queryClient = useQueryClient();
 
-  function add() {
+  async function add() {
     const n = name.trim();
     if (!n) return;
     const slug = slugify(n);
@@ -148,23 +203,41 @@ function CategoriesTab({ categories, products }: { categories: Category[]; produ
       alert("Category already exists or has invalid name.");
       return;
     }
-    saveCategories([...categories, { slug, name: n }]);
-    setName("");
+
+    try {
+      await fetchCreateCategory(n);
+      queryClient.invalidateQueries(["categories"]);
+      setName("");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : String(error));
+    }
   }
 
-  function remove(slug: string) {
+  async function remove(slug: string) {
     const inUse = products.filter((p) => p.category === slug).length;
     if (inUse > 0 && !confirm(`${inUse} product(s) use this category. Delete anyway?`)) return;
-    saveCategories(categories.filter((c) => c.slug !== slug));
+
+    try {
+      await fetchDeleteCategory(slug);
+      queryClient.invalidateQueries(["categories"]);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : String(error));
+    }
   }
 
-  function saveEdit() {
+  async function saveEdit() {
     if (!editingSlug) return;
     const n = editingName.trim();
     if (!n) return;
-    saveCategories(categories.map((c) => (c.slug === editingSlug ? { ...c, name: n } : c)));
-    setEditingSlug(null);
-    setEditingName("");
+
+    try {
+      await fetchUpdateCategory(editingSlug, n);
+      queryClient.invalidateQueries(["categories"]);
+      setEditingSlug(null);
+      setEditingName("");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : String(error));
+    }
   }
 
   return (
@@ -239,17 +312,32 @@ function CategoriesTab({ categories, products }: { categories: Category[]; produ
 function ProductsTab({ products, categories }: { products: Product[]; categories: Category[] }) {
   const [editing, setEditing] = useState<Product | null>(null);
   const [creating, setCreating] = useState(false);
+  const queryClient = useQueryClient();
 
-  function remove(id: string) {
+  async function remove(id: string) {
     if (!confirm("Delete this product?")) return;
-    saveProducts(products.filter((p) => p.id !== id));
+    try {
+      await fetchDeleteProduct(id);
+      queryClient.invalidateQueries(["products"]);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : String(error));
+    }
   }
 
-  function upsert(p: Product) {
-    const exists = products.some((x) => x.id === p.id);
-    saveProducts(exists ? products.map((x) => (x.id === p.id ? p : x)) : [...products, p]);
-    setEditing(null);
-    setCreating(false);
+  async function upsert(p: Product) {
+    try {
+      const exists = products.some((x) => x.id === p.id);
+      if (exists) {
+        await fetchUpdateProduct(p);
+      } else {
+        await fetchCreateProduct(p);
+      }
+      queryClient.invalidateQueries(["products"]);
+      setEditing(null);
+      setCreating(false);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : String(error));
+    }
   }
 
   if (creating || editing) {
@@ -305,6 +393,146 @@ function ProductsTab({ products, categories }: { products: Product[]; categories
             ))}
           </ul>
         )}
+      </div>
+    </div>
+  );
+}
+
+function OrdersTab({ orders }: { orders: OrderRecord[] }) {
+  return (
+    <div>
+      <div className="flex justify-between gap-3">
+        <p className="text-sm text-muted-foreground">Showing {orders.length} order{orders.length === 1 ? "" : "s"}</p>
+      </div>
+      <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-card">
+        {orders.length === 0 ? (
+          <p className="px-5 py-10 text-center text-sm text-muted-foreground">No orders have been placed yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-border bg-muted">
+                <tr>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Order</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Customer</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Email</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Total</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Paid</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => (
+                  <tr key={order.id} className="border-b border-border hover:bg-muted/40">
+                    <td className="px-4 py-3 font-medium text-foreground">{order.orderNumber}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{order.name}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{order.email}</td>
+                    <td className="px-4 py-3 text-foreground">{formatPrice(order.total)}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{order.payment.toUpperCase()}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{new Date(order.createdAt).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function UsersTab() {
+  const queryClient = useQueryClient();
+  const { data: users = [] } = useApiUsers();
+
+  async function setRole(email: string, role: "admin" | "customer") {
+    try {
+      await promoteUser(email, role);
+      queryClient.invalidateQueries(["users"]);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function del(email: string) {
+    if (!confirm(`Delete user ${email}?`)) return;
+    try {
+      await removeUser(email);
+      queryClient.invalidateQueries(["users"]);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex justify-between gap-3">
+        <p className="text-sm text-muted-foreground">Users ({users.length})</p>
+      </div>
+      <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-card">
+        {users.length === 0 ? (
+          <p className="px-5 py-10 text-center text-sm text-muted-foreground">No users found.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-border bg-muted">
+                <tr>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Name</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Email</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Role</th>
+                  <th className="px-4 py-3 font-medium text-muted-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.email} className="border-b border-border hover:bg-muted/40">
+                    <td className="px-4 py-3 font-medium text-foreground">{u.name}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{u.role}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {u.role !== "admin" && <button onClick={() => setRole(u.email, "admin")} className="mr-2 text-xs text-primary">Make admin</button>}
+                      {u.role === "admin" && <button onClick={() => setRole(u.email, "customer")} className="mr-2 text-xs text-muted-foreground">Demote</button>}
+                      <button onClick={() => del(u.email)} className="text-xs text-destructive">Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AnalyticsTab({ orders, products }: { orders: OrderRecord[]; products: Product[] }) {
+  const totalRevenue = orders.reduce((s, o) => s + (o.total || 0), 0);
+  const avgOrder = orders.length ? totalRevenue / orders.length : 0;
+  const totalOrders = orders.length;
+  const totalProducts = products.length;
+
+  return (
+    <div>
+      <div className="grid grid-cols-3 gap-3 sm:max-w-md">
+        <Stat label="Total revenue" value={Number(totalRevenue.toFixed(0))} />
+        <Stat label="Avg order" value={Number(avgOrder.toFixed(0))} />
+        <Stat label="Orders" value={totalOrders} />
+      </div>
+
+      <div className="mt-6">
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <h3 className="font-semibold">Overview</h3>
+          <p className="mt-2 text-sm text-muted-foreground">Quick store metrics and recent trends.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-border bg-muted p-4">
+              <p className="text-xs text-muted-foreground">Products</p>
+              <p className="mt-1 font-display text-xl font-bold">{totalProducts}</p>
+            </div>
+            <div className="rounded-lg border border-border bg-muted p-4">
+              <p className="text-xs text-muted-foreground">Revenue</p>
+              <p className="mt-1 font-display text-xl font-bold">{formatPrice(totalRevenue)}</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 export type Product = {
   id: string;
@@ -14,6 +15,20 @@ export type Product = {
 export type Category = {
   slug: string;
   name: string;
+};
+
+export type OrderRecord = {
+  id: number;
+  orderNumber: string;
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  payment: string;
+  subtotal: number;
+  shipping: number;
+  total: number;
+  createdAt: string;
 };
 
 export const seedCategories: Category[] = [
@@ -43,63 +58,8 @@ export const seedProducts: Product[] = [
   { id: "p12", name: "Aroma Diffuser", category: "home", price: 54, image: img("photo-1602928298849-325cec8771c0"), description: "Ultrasonic essential oil diffuser with ambient LED lighting." },
 ];
 
-const CAT_KEY = "shopease.categories.v2";
-const PROD_KEY = "shopease.products.v2";
-
-function safeParse<T>(raw: string | null, fallback: T): T {
-  if (!raw) return fallback;
-  try { return JSON.parse(raw) as T; } catch { return fallback; }
-}
-
-export function loadCategories(): Category[] {
-  if (typeof window === "undefined") return seedCategories;
-  return safeParse(localStorage.getItem(CAT_KEY), seedCategories);
-}
-export function loadProducts(): Product[] {
-  if (typeof window === "undefined") return seedProducts;
-  return safeParse(localStorage.getItem(PROD_KEY), seedProducts);
-}
-
-const listeners = new Set<() => void>();
-function emit() { listeners.forEach((f) => f()); }
-
-export function saveCategories(c: Category[]) {
-  localStorage.setItem(CAT_KEY, JSON.stringify(c));
-  emit();
-}
-export function saveProducts(p: Product[]) {
-  localStorage.setItem(PROD_KEY, JSON.stringify(p));
-  emit();
-}
-
-export function useCategories(): Category[] {
-  const [c, setC] = useState<Category[]>(seedCategories);
-  useEffect(() => {
-    setC(loadCategories());
-    const fn = () => setC(loadCategories());
-    listeners.add(fn);
-    return () => { listeners.delete(fn); };
-  }, []);
-  return c;
-}
-
-export function useProducts(): Product[] {
-  const [p, setP] = useState<Product[]>(seedProducts);
-  useEffect(() => {
-    setP(loadProducts());
-    const fn = () => setP(loadProducts());
-    listeners.add(fn);
-    return () => { listeners.delete(fn); };
-  }, []);
-  return p;
-}
-
-export function getProduct(id: string): Product | undefined {
-  return loadProducts().find((p) => p.id === id);
-}
-
 export function categoryName(slug: string, list?: Category[]): string {
-  const cats = list ?? loadCategories();
+  const cats = list ?? seedCategories;
   return cats.find((c) => c.slug === slug)?.name ?? slug;
 }
 
@@ -109,4 +69,158 @@ export function newId(prefix = "p") {
 
 export function slugify(s: string) {
   return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function fetchApi<T>(path: string): Promise<T> {
+  if (import.meta.env.SSR) { throw new Error("API fetch is only available in the browser"); }
+
+  return fetch(path).then((res) => {
+    if (!res.ok) {
+      throw new Error(`API request failed: ${res.status}`);
+    }
+    return res.json() as Promise<T>;
+  });
+}
+
+export async function fetchCategories(): Promise<Category[]> {
+  if (import.meta.env.SSR) {
+    const { getCategories } = await import("@/lib/db");
+    return getCategories();
+  }
+  return fetchApi<Category[]>('/api/categories');
+}
+
+export async function fetchProducts(category?: string, q?: string): Promise<Product[]> {
+  if (import.meta.env.SSR) {
+    const { getProducts } = await import("@/lib/db");
+    return getProducts(category, q);
+  }
+
+  const url = new URL('/api/products', window.location.href);
+  if (category) url.searchParams.set('category', category);
+  if (q) url.searchParams.set('q', q);
+  return fetchApi<Product[]>(url.toString());
+}
+
+export async function fetchProduct(id: string): Promise<Product | null> {
+  if (import.meta.env.SSR) {
+    const { getProductById } = await import("@/lib/db");
+    return (await getProductById(id)) ?? null;
+  }
+
+  return fetch(`/api/products/${encodeURIComponent(id)}`).then(async (res) => {
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`Unable to load product ${id}`);
+    return (await res.json()) as Product;
+  });
+}
+
+function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  if (import.meta.env.SSR) { throw new Error("API request is only available in the browser"); }
+
+  return fetch(path, init).then(async (res) => {
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `API request failed: ${res.status}`);
+    }
+    return res.json() as Promise<T>;
+  });
+}
+
+export function fetchCreateCategory(name: string): Promise<Category> {
+  return apiRequest<Category>("/api/admin/categories", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function fetchUpdateCategory(slug: string, name: string): Promise<Category> {
+  return apiRequest<Category>(`/api/admin/categories/${encodeURIComponent(slug)}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function fetchDeleteCategory(slug: string): Promise<{ success: true }> {
+  return apiRequest<{ success: true }>(`/api/admin/categories/${encodeURIComponent(slug)}`, {
+    method: "DELETE",
+  });
+}
+
+export function fetchCreateProduct(product: Product): Promise<Product> {
+  return apiRequest<Product>("/api/admin/products", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(product),
+  });
+}
+
+export async function fetchOrders(): Promise<OrderRecord[]> {
+  if (import.meta.env.SSR) {
+    const { getOrders } = await import("@/lib/db");
+    return getOrders();
+  }
+
+  return fetchApi<OrderRecord[]>("/api/admin/orders");
+}
+
+export function fetchUpdateProduct(product: Product): Promise<Product> {
+  return apiRequest<Product>(`/api/admin/products/${encodeURIComponent(product.id)}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(product),
+  });
+}
+
+export function fetchDeleteProduct(id: string): Promise<{ success: true }> {
+  return apiRequest<{ success: true }>(`/api/admin/products/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
+export function fetchResetStore(): Promise<{ success: true }> {
+  return apiRequest<{ success: true }>("/api/admin/reset", {
+    method: "POST",
+  });
+}
+
+export function useApiOrders() {
+  return useQuery({
+    queryKey: ["orders"],
+    queryFn: fetchOrders,
+    staleTime: 1000 * 60 * 2,
+    initialData: [] as OrderRecord[],
+    enabled: true,
+  });
+}
+
+export function useApiCategories() {
+  return useQuery({
+    queryKey: ["categories"],
+    queryFn: fetchCategories,
+    staleTime: 1000 * 60 * 5,
+    initialData: seedCategories,
+    enabled: true,
+  });
+}
+
+export function useApiProducts(category?: string, q?: string) {
+  return useQuery({
+    queryKey: ["products", category ?? "", q ?? ""],
+    queryFn: () => fetchProducts(category, q),
+    staleTime: 1000 * 60 * 2,
+    initialData: [] as Product[],
+    enabled: true,
+  });
+}
+
+export function useApiProduct(id: string) {
+  return useQuery({
+    queryKey: ["product", id],
+    queryFn: () => fetchProduct(id),
+    staleTime: 1000 * 60 * 2,
+    enabled: Boolean(id),
+  });
 }
