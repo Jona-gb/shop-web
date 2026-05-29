@@ -30,6 +30,7 @@ function json(data: unknown, status = 200, headers: Record<string, string> = {})
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=600",
       ...headers,
     },
   });
@@ -83,6 +84,7 @@ async function parseRequestBody(request: Request) {
 export async function handleApiRequest(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, "");
+  const startTime = performance.now();
 
   if (path === "/api/categories" && request.method === "GET") {
     return json(await getCategories());

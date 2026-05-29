@@ -326,46 +326,43 @@ export async function getHomePageProducts(): Promise<{
   await ensureInitialized();
   const pool = await poolPromise;
 
-  const [featuredRows] = await pool.query<RowDataPacket[]>(
-    "SELECT * FROM products WHERE isFeatured = 1 ORDER BY name LIMIT 8",
+  // Combine all queries into one with UNION to reduce round trips
+  const [allRows] = await pool.query<RowDataPacket[]>(
+    `(
+      SELECT p.*, 'featured' AS type FROM products p WHERE p.isFeatured = 1 ORDER BY p.name LIMIT 8
+    )
+    UNION ALL
+    (
+      SELECT p.*, 'new' AS type FROM products p WHERE p.isNew = 1 ORDER BY p.name LIMIT 8
+    )`,
   );
-  const featured = (featuredRows as ProductRow[]).map((product) => ({
-    ...product,
-    isNew: Boolean(product.isNew),
-    isFeatured: Boolean(product.isFeatured),
-  }));
 
-  const [newRows] = await pool.query<RowDataPacket[]>(
-    "SELECT * FROM products WHERE isNew = 1 ORDER BY name LIMIT 8",
-  );
-  const newArrivals = (newRows as ProductRow[]).map((product) => ({
-    ...product,
-    isNew: Boolean(product.isNew),
-    isFeatured: Boolean(product.isFeatured),
-  }));
+  const featured: Product[] = [];
+  const newArrivals: Product[] = [];
 
+  (allRows as (ProductRow & { type: string })[]).forEach((product) => {
+    const converted = {
+      ...product,
+      isNew: Boolean(product.isNew),
+      isFeatured: Boolean(product.isFeatured),
+    };
+    if (product.type === 'featured') featured.push(converted);
+    if (product.type === 'new') newArrivals.push(converted);
+  });
+
+  // Get categories with counts in one query
   const [categoryStatsRows] = await pool.query<RowDataPacket[]>(
-    `SELECT category AS slug, COUNT(*) AS count FROM products GROUP BY category`,
+    `SELECT c.slug, c.name, COUNT(p.id) AS count 
+     FROM categories c 
+     LEFT JOIN products p ON c.slug = p.category 
+     GROUP BY c.slug, c.name`,
   );
-  const categoryStats = (categoryStatsRows as Array<{ slug: string; count: number }>).map((row) => ({
-    slug: row.slug,
-    name: row.slug,
-    count: row.count,
-  }));
-
-  const [categoryNames] = await pool.query<RowDataPacket[]>(
-    `SELECT slug, name FROM categories`,
-  );
-  const categoryMap = new Map((categoryNames as Array<{ slug: string; name: string }>).map((c) => [c.slug, c.name]));
+  const categoryStats = (categoryStatsRows as Array<{ slug: string; name: string; count: number }>);
 
   return {
     featured,
     newArrivals,
-    categoryStats: categoryStats.map((stat) => ({
-      slug: stat.slug,
-      name: categoryMap.get(stat.slug) ?? stat.slug,
-      count: stat.count,
-    })),
+    categoryStats,
   };
 }
 

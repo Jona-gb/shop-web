@@ -449,7 +449,7 @@ function CategoriesTab({ categories, products, loading }: { categories: Category
 
     try {
       await fetchCreateCategory(n);
-      queryClient.invalidateQueries(["categories"]);
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       setName("");
     } catch (error) {
       alert(error instanceof Error ? error.message : String(error));
@@ -462,7 +462,7 @@ function CategoriesTab({ categories, products, loading }: { categories: Category
 
     try {
       await fetchDeleteCategory(slug);
-      queryClient.invalidateQueries(["categories"]);
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
     } catch (error) {
       alert(error instanceof Error ? error.message : String(error));
     }
@@ -475,7 +475,7 @@ function CategoriesTab({ categories, products, loading }: { categories: Category
 
     try {
       await fetchUpdateCategory(editingSlug, n);
-      queryClient.invalidateQueries(["categories"]);
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
       setEditingSlug(null);
       setEditingName("");
     } catch (error) {
@@ -577,7 +577,7 @@ function ProductsTab({ products, categories, loading }: { products: Product[]; c
     if (!confirm("Delete this product?")) return;
     try {
       await fetchDeleteProduct(id);
-      queryClient.invalidateQueries(["products"]);
+      queryClient.invalidateQueries({ queryKey: ["products"] });
     } catch (error) {
       alert(error instanceof Error ? error.message : String(error));
     }
@@ -591,7 +591,7 @@ function ProductsTab({ products, categories, loading }: { products: Product[]; c
       } else {
         await fetchCreateProduct(p);
       }
-      queryClient.invalidateQueries(["products"]);
+      queryClient.invalidateQueries({ queryKey: ["products"] });
       setEditing(null);
       setCreating(false);
     } catch (error) {
@@ -732,7 +732,7 @@ function UsersTab({ loading }: { loading: boolean }) {
   async function setRole(email: string, role: "admin" | "customer") {
     try {
       await promoteUser(email, role);
-      queryClient.invalidateQueries(["users"]);
+      queryClient.invalidateQueries({ queryKey: ["users"] });
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
     }
@@ -742,7 +742,7 @@ function UsersTab({ loading }: { loading: boolean }) {
     if (!confirm(`Delete user ${email}?`)) return;
     try {
       await removeUser(email);
-      queryClient.invalidateQueries(["users"]);
+      queryClient.invalidateQueries({ queryKey: ["users"] });
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
     }

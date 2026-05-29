@@ -240,8 +240,8 @@ export function useApiCategories() {
   return useQuery({
     queryKey: ["categories"],
     queryFn: fetchCategories,
-    staleTime: 1000 * 60 * 5,
-    initialData: seedCategories,
+    staleTime: 1000 * 60 * 30,
+    gcTime: 1000 * 60 * 60,
     enabled: true,
   });
 }
@@ -250,8 +250,8 @@ export function useApiProducts(category?: string, q?: string, limit?: number) {
   return useQuery({
     queryKey: ["products", category ?? "", q ?? "", limit ?? 0],
     queryFn: () => fetchProducts(category, q, limit),
-    staleTime: 1000 * 60 * 2,
-    initialData: [] as Product[],
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 30,
     enabled: true,
   });
 }
@@ -261,7 +261,6 @@ export function useApiProductsByIds(ids: string[]) {
     queryKey: ["products-by-ids", ...ids],
     queryFn: () => fetchProductsByIds(ids),
     staleTime: 1000 * 60 * 2,
-    initialData: [] as Product[],
     enabled: ids.length > 0,
   });
 }
@@ -270,8 +269,8 @@ export function useApiHomeProducts() {
   return useQuery({
     queryKey: ["home-page-data"],
     queryFn: fetchHomeProducts,
-    staleTime: 1000 * 60 * 5,
-    initialData: { featured: [], newArrivals: [], categoryStats: [] } as HomePageData,
+    staleTime: 1000 * 60 * 30,
+    gcTime: 1000 * 60 * 60,
     enabled: true,
   });
 }
@@ -281,7 +280,6 @@ export function useApiRelatedProducts(category: string, excludeId: string, limit
     queryKey: ["related-products", category, excludeId, limit],
     queryFn: () => fetchRelatedProducts(category, excludeId, limit),
     staleTime: 1000 * 60 * 5,
-    initialData: [] as Product[],
     enabled: Boolean(category && excludeId),
   });
 }
