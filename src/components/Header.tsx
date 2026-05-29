@@ -5,13 +5,15 @@ import {
   LogIn,
   LogOut,
   Menu,
+  Moon,
   Search,
   ShoppingBag,
   Sparkles,
+  Sun,
   User,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCart } from "@/lib/cart";
 import { useApiCategories } from "@/lib/products";
 import { useAuth } from "@/lib/auth";
@@ -23,7 +25,20 @@ export function Header() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const topCats = categories.slice(0, 4);
+
+  useEffect(() => {
+    const storedTheme = window.localStorage.getItem("theme") as "light" | "dark" | null;
+    const initialTheme = storedTheme ?? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    setTheme(initialTheme);
+    document.documentElement.classList.toggle("dark", initialTheme === "dark");
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    window.localStorage.setItem("theme", theme);
+  }, [theme]);
 
   const handleLogout = () => {
     logout();
@@ -32,29 +47,29 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-[#111827] text-white shadow-[0_12px_30px_rgba(15,23,42,0.12)]">
+    <header className={`sticky top-0 z-40 ${theme === "dark" ? "bg-[#111827] text-white shadow-[0_12px_30px_rgba(15,23,42,0.12)]" : "bg-white text-slate-900 shadow-sm"}`}>
       <div className="pointer-events-none absolute inset-x-0 top-0 h-24 overflow-hidden">
         <div className="h-full bg-[radial-gradient(circle_at_20%_0%,rgba(37,99,235,0.22),transparent_28%),radial-gradient(circle_at_85%_15%,rgba(255,107,90,0.18),transparent_24%)]" />
       </div>
-      <div className="relative hidden border-b border-white/10 bg-[#1f2937]/80 text-[11px] text-white/75 backdrop-blur md:block">
+      <div className={`relative hidden border-b ${theme === "dark" ? "border-white/10 bg-[#1f2937]/80 text-white/75" : "border-border bg-card text-muted-foreground"} text-[11px] backdrop-blur md:block`}>
         <div className="mx-auto flex h-8 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-4">
             <span>English</span>
             <span className="inline-flex items-center gap-1">USD <ChevronDown className="h-3 w-3" /></span>
-            <span className="inline-flex items-center gap-1.5 text-white">
+            <span className={`inline-flex items-center gap-1.5 ${theme === "dark" ? "text-white" : "text-muted-foreground"}`}>
               <Sparkles className="h-3 w-3 text-[#ff6b5a]" />
               Free shipping on all orders over $100
             </span>
           </div>
           <div className="flex items-center gap-5">
-            <Link to="/login" search={{ redirect: "/" }} className="hover:text-white">My account</Link>
-            <Link to="/products" className="hover:text-white">Compare</Link>
-            <Link to="/cart" className="hover:text-white">Cart ({count})</Link>
+            <Link to="/login" search={{ redirect: "/" }} className={theme === "dark" ? "hover:text-white" : "hover:text-foreground"}>My account</Link>
+            <Link to="/products" className={theme === "dark" ? "hover:text-white" : "hover:text-foreground"}>Compare</Link>
+            <Link to="/cart" className={theme === "dark" ? "hover:text-white" : "hover:text-foreground"}>Cart ({count})</Link>
           </div>
         </div>
       </div>
 
-      <div className="relative mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+      <div className={`relative mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8 ${theme === "dark" ? "" : ""}`}>
         <button
           className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/5 text-white/85 transition hover:bg-white/10 md:hidden"
           onClick={() => setOpen((o) => !o)}
@@ -119,6 +134,14 @@ export function Header() {
               <LayoutDashboard className="h-5 w-5" />
             </Link>
           )}
+          <button
+            type="button"
+            onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+            className="hidden h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/80 transition hover:bg-white/10 sm:inline-flex"
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
 
           {user ? (
             <div className="relative">

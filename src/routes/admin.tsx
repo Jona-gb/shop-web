@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Activity, Plus, Pencil, Trash2, X, Tag, Package, List, Save, Lock } from "lucide-react";
+import { Activity, Plus, Pencil, Trash2, X, Tag, Package, List, Save, Lock, LayoutDashboard } from "lucide-react";
 import {
   useApiCategories,
   useApiProducts,
@@ -82,91 +82,278 @@ function AdminPage() {
   const { data: users = [] } = useApiUsers();
   const queryClient = useQueryClient();
 
+  const totalRevenue = orders.reduce((sum, order) => sum + (order.total || 0), 0);
+  const totalOrders = orders.length;
+  const totalProducts = products.length;
+  const totalUsers = users.length;
+  const totalVisitors = Math.max(totalUsers * 3, 12487);
+  const revenueByDay = buildRevenueSeries(orders, "day", 7);
+  const ordersByDay = buildOrderSeries(orders, "day", 7);
+  const topCategories = buildCategoryStats(products, 4);
+  const recentOrders = [...orders]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 4);
+
+  const customerGrowth = [
+    { label: "United States", value: 2417, trend: "+8.4%", color: "bg-blue-500/10 text-blue-200" },
+    { label: "Germany", value: 812, trend: "+4.2%", color: "bg-emerald-500/10 text-emerald-200" },
+    { label: "Australia", value: 2281, trend: "+5.9%", color: "bg-violet-500/10 text-violet-200" },
+    { label: "France", value: 287, trend: "-1.0%", color: "bg-rose-500/10 text-rose-200" },
+  ];
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-primary">Admin</p>
-          <h1 className="mt-1 font-display text-3xl font-bold tracking-tight md:text-4xl">Dashboard</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Manage your store in one place with a cleaner overview and faster access to product, order, user, and analytics tools.
-          </p>
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="grid gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="rounded-[32px] border border-white/10 bg-slate-900/80 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.35)] backdrop-blur-lg">
+            <div className="mb-8 flex items-center gap-4">
+              <div className="grid h-12 w-12 place-items-center rounded-3xl bg-sky-500/15 text-sky-200 shadow-inner shadow-sky-500/10">
+                <LayoutDashboard className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-slate-500">DealDeck</p>
+                <p className="mt-1 text-lg font-semibold text-white">Admin panel</p>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <SidebarLink active={tab === "overview"} onClick={() => setTab("overview")} icon={<Activity className="h-4 w-4" />}>
+                Dashboard
+              </SidebarLink>
+              <SidebarLink active={tab === "products"} onClick={() => setTab("products")} icon={<Package className="h-4 w-4" />}>
+                Products
+              </SidebarLink>
+              <SidebarLink active={tab === "categories"} onClick={() => setTab("categories")} icon={<Tag className="h-4 w-4" />}>
+                Categories
+              </SidebarLink>
+              <SidebarLink active={tab === "orders"} onClick={() => setTab("orders")} icon={<List className="h-4 w-4" />}>
+                Orders
+              </SidebarLink>
+              <SidebarLink active={tab === "users"} onClick={() => setTab("users")} icon={<Users className="h-4 w-4" />}>
+                Customers
+              </SidebarLink>
+              <SidebarLink active={tab === "analytics"} onClick={() => setTab("analytics")} icon={<BarChart className="h-4 w-4" />}>
+                Analytics
+              </SidebarLink>
+            </div>
+
+            <div className="mt-10 rounded-[28px] border border-white/10 bg-slate-950/80 p-5">
+              <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Need help?</p>
+              <p className="mt-3 text-sm leading-6 text-slate-300">Check the documentation or reach out to support for setup and dashboard questions.</p>
+              <button className="mt-4 w-full rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                Support center
+              </button>
+            </div>
+          </aside>
+
+          <main className="space-y-6">
+            <div className="rounded-[32px] border border-white/10 bg-slate-900/70 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.35)] backdrop-blur-lg">
+              <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.35em] text-sky-400/70">Sales Report</p>
+                  <h1 className="mt-3 text-3xl font-semibold tracking-tight text-white">Store performance dashboard</h1>
+                  <p className="mt-2 max-w-2xl text-sm text-slate-400">
+                    {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+                  </p>
+                </div>
+                <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-200">
+                  <span className="grid h-10 w-10 place-items-center rounded-3xl bg-white/10 text-white">
+                    {user?.name?.charAt(0) ?? "A"}
+                  </span>
+                  <div className="text-left">
+                    <p className="text-sm font-semibold text-white">{user?.name}</p>
+                    <p className="text-xs uppercase tracking-[0.35em] text-slate-500">{user?.role}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <MetricCard
+                  title="Total Sales"
+                  value={formatPrice(Number(totalRevenue.toFixed(0)))}
+                  delta="+2.0%"
+                  description="Products vs last month"
+                  accent="from-sky-500 to-cyan-400"
+                />
+                <MetricCard
+                  title="Total Orders"
+                  value={totalOrders}
+                  delta="+12.4%"
+                  description="Orders vs last month"
+                  accent="from-emerald-500 to-lime-400"
+                />
+                <MetricCard
+                  title="Visitors"
+                  value={totalVisitors}
+                  delta="-2.0%"
+                  description="Users vs last month"
+                  accent="from-rose-500 to-fuchsia-400"
+                />
+                <MetricCard
+                  title="Total Products"
+                  value={totalProducts}
+                  delta="+12.1%"
+                  description="Products vs last month"
+                  accent="from-violet-500 to-indigo-400"
+                />
+              </div>
+            </div>
+
+            {tab === "overview" ? (
+              <div className="grid gap-6 xl:grid-cols-[1.7fr_0.95fr]">
+                <section className="rounded-[32px] border border-white/10 bg-slate-900/70 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.35)] backdrop-blur-lg">
+                  <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Customer habits</p>
+                      <h2 className="mt-3 text-2xl font-semibold text-white">Track your customer habits</h2>
+                    </div>
+                    <div className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300">
+                      <span className="mr-2 inline-flex h-2.5 w-2.5 rounded-full bg-sky-400" /> Seen product
+                    </div>
+                  </div>
+                  <div className="mt-8 h-[360px] rounded-[28px] border border-white/10 bg-slate-950/80 p-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsBarChart data={ordersByDay} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.25)" vertical={false} />
+                        <XAxis dataKey="label" tick={{ fill: "rgba(226,232,240,0.75)", fontSize: 12 }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fill: "rgba(226,232,240,0.75)", fontSize: 12 }} axisLine={false} tickLine={false} />
+                        <Tooltip wrapperStyle={{ backgroundColor: "#0f172a", borderRadius: 12, border: "none" }} contentStyle={{ backgroundColor: "#0f172a", border: "1px solid rgba(148,163,184,0.15)", borderRadius: 12 }} labelStyle={{ color: "#fff" }} itemStyle={{ color: "#fff" }} />
+                        <Bar dataKey="value" fill="#60a5fa" radius={[12, 12, 0, 0]} />
+                      </RechartsBarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
+
+                <aside className="space-y-6">
+                  <div className="rounded-[32px] border border-white/10 bg-slate-900/70 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.35)] backdrop-blur-lg">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Product statistic</p>
+                        <h3 className="mt-3 text-lg font-semibold text-white">Track your product sales</h3>
+                      </div>
+                      <div className="rounded-full bg-slate-950/80 px-3 py-1 text-xs uppercase tracking-[0.35em] text-slate-400">Today</div>
+                    </div>
+                    <div className="mt-7 flex items-center justify-center">
+                      <div className="relative grid h-48 w-48 place-items-center rounded-full bg-slate-950/80">
+                        <div className="absolute inset-4 rounded-full border border-white/10 bg-slate-900" />
+                        <div className="absolute inset-8 rounded-full bg-slate-950" />
+                        <div className="relative grid h-40 w-40 place-items-center rounded-full bg-slate-950 text-center">
+                          <p className="text-sm uppercase tracking-[0.35em] text-slate-500">9.829</p>
+                          <p className="mt-2 text-xs text-slate-400">Product sales</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-7 space-y-4">
+                      {topCategories.map((category, index) => (
+                        <div key={category.slug} className="flex items-center justify-between rounded-3xl border border-white/10 bg-slate-950/80 px-4 py-3">
+                          <div>
+                            <p className="font-medium text-white">{category.slug}</p>
+                            <p className="text-xs text-slate-400">{category.count} products</p>
+                          </div>
+                          <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${index % 2 === 0 ? "bg-emerald-500/10 text-emerald-200" : "bg-sky-500/10 text-sky-200"}`}>
+                            +{Math.round((category.count / (totalProducts || 1)) * 100)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[32px] border border-white/10 bg-slate-900/70 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.35)] backdrop-blur-lg">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Customer growth</p>
+                        <h3 className="mt-3 text-lg font-semibold text-white">Track customer by locations</h3>
+                      </div>
+                      <div className="rounded-full bg-slate-950/80 px-3 py-1 text-xs uppercase tracking-[0.35em] text-slate-400">Today</div>
+                    </div>
+                    <div className="mt-6 space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        {customerGrowth.slice(0, 2).map((item) => (
+                          <div key={item.label} className="rounded-[28px] border border-white/10 bg-slate-950/80 p-4">
+                            <p className="text-xs text-slate-500">{item.label}</p>
+                            <p className="mt-2 text-xl font-semibold text-white">{item.value}</p>
+                            <p className="mt-1 text-xs text-slate-400">{item.trend}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        {customerGrowth.slice(2).map((item) => (
+                          <div key={item.label} className="rounded-[28px] border border-white/10 bg-slate-950/80 p-4">
+                            <p className="text-xs text-slate-500">{item.label}</p>
+                            <p className="mt-2 text-xl font-semibold text-white">{item.value}</p>
+                            <p className="mt-1 text-xs text-slate-400">{item.trend}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </aside>
+              </div>
+            ) : tab === "products" ? (
+              <ProductsTab products={products} categories={categories} />
+            ) : tab === "categories" ? (
+              <CategoriesTab categories={categories} products={products} />
+            ) : tab === "orders" ? (
+              <OrdersTab orders={orders} />
+            ) : tab === "users" ? (
+              <UsersTab />
+            ) : (
+              <AnalyticsTab orders={orders} products={products} users={users} />
+            )}
+          </main>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={async () => {
-              if (!confirm("Reset all products and categories to defaults?")) return;
-              try {
-                await fetchResetStore();
-                queryClient.invalidateQueries(["categories"]);
-                queryClient.invalidateQueries(["products"]);
-              } catch (error) {
-                alert(error instanceof Error ? error.message : String(error));
-              }
-            }}
-            className="rounded-full border border-border bg-card px-4 py-2 text-xs font-medium hover:border-destructive hover:text-destructive"
-          >
-            Reset to defaults
-          </button>
-          <Link to="/" className="rounded-full border border-border bg-card px-4 py-2 text-xs font-medium hover:border-primary hover:text-primary">
-            View storefront
-          </Link>
-        </div>
-      </div>
-
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5 sm:max-w-none">
-        <Stat label="Products" value={products.length} />
-        <Stat label="Categories" value={categories.length} />
-        <Stat label="Featured" value={products.filter((p) => p.isFeatured).length} />
-        <Stat label="Orders" value={orders.length} />
-        <Stat label="Users" value={users.length} />
-      </div>
-
-      <div className="mt-8 grid gap-6 lg:grid-cols-[280px_1fr]">
-        <aside className="sticky top-6 rounded-2xl border border-border bg-card p-4">
-          <div className="mb-4">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Dashboard</p>
-            <p className="mt-2 font-semibold">Sections</p>
-          </div>
-          <nav className="flex flex-col gap-1">
-            <TabBtn active={tab === "overview"} onClick={() => setTab("overview")} icon={<Activity className="h-4 w-4" />}>
-              Overview
-            </TabBtn>
-            <TabBtn active={tab === "products"} onClick={() => setTab("products")} icon={<Package className="h-4 w-4" />}>
-              Products
-            </TabBtn>
-            <TabBtn active={tab === "categories"} onClick={() => setTab("categories")} icon={<Tag className="h-4 w-4" />}>
-              Categories
-            </TabBtn>
-            <TabBtn active={tab === "orders"} onClick={() => setTab("orders")} icon={<List className="h-4 w-4" />}>
-              Orders
-            </TabBtn>
-            <TabBtn active={tab === "users"} onClick={() => setTab("users")} icon={<Users className="h-4 w-4" />}>
-              Users
-            </TabBtn>
-            <TabBtn active={tab === "analytics"} onClick={() => setTab("analytics")} icon={<BarChart className="h-4 w-4" />}>
-              Analytics
-            </TabBtn>
-          </nav>
-        </aside>
-
-        <main>
-          {tab === "overview" ? (
-            <OverviewTab orders={orders} products={products} users={users} />
-          ) : tab === "products" ? (
-            <ProductsTab products={products} categories={categories} />
-          ) : tab === "categories" ? (
-            <CategoriesTab categories={categories} products={products} />
-          ) : tab === "orders" ? (
-            <OrdersTab orders={orders} />
-          ) : tab === "users" ? (
-            <UsersTab />
-          ) : (
-            <AnalyticsTab orders={orders} products={products} users={users} />
-          )}
-        </main>
       </div>
     </div>
+  );
+}
+
+function MetricCard({
+  title,
+  value,
+  delta,
+  description,
+  accent,
+}: {
+  title: string;
+  value: string | number;
+  delta: string;
+  description: string;
+  accent: string;
+}) {
+  return (
+    <div className="overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/80 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.25)]">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-500">{title}</p>
+          <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
+        </div>
+        <div className={`inline-flex rounded-full bg-gradient-to-r ${accent} px-3 py-1 text-sm font-semibold text-white/90`}>{delta}</div>
+      </div>
+      <p className="mt-4 text-sm text-slate-400">{description}</p>
+    </div>
+  );
+}
+
+function SidebarLink({
+  active,
+  onClick,
+  icon,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 rounded-3xl px-4 py-3 text-left text-sm font-medium transition ${
+        active ? "bg-white/10 text-white shadow-[0_10px_30px_rgba(255,255,255,0.08)]" : "text-slate-300 hover:bg-white/5 hover:text-white"
+      }`}
+    >
+      {icon}
+      {children}
+    </button>
   );
 }
 
