@@ -296,19 +296,20 @@ export async function handleApiRequest(request) {
       };
     });
 
-    const orderItems = await Promise.all(
-      validatedItems.map(async (item) => {
-        const product = await getProductById(item.productId);
-        if (!product) {
-          throw new Error(`Product not found: ${item.productId}`);
-        }
-        return {
-          productId: item.productId,
-          qty: item.qty,
-          lineTotal: product.price * item.qty,
-        };
-      }),
-    );
+    const products = await getProductsByIds(validatedItems.map((item) => item.productId));
+    const productMap = new Map(products.map((product) => [product.id, product]));
+
+    const orderItems = validatedItems.map((item) => {
+      const product = productMap.get(item.productId);
+      if (!product) {
+        throw new Error(`Product not found: ${item.productId}`);
+      }
+      return {
+        productId: item.productId,
+        qty: item.qty,
+        lineTotal: product.price * item.qty,
+      };
+    });
 
     const subtotal = orderItems.reduce((sum, item) => sum + item.lineTotal, 0);
     const shipping = getShippingCost(subtotal);

@@ -1,5 +1,37 @@
 import { createPool } from 'mysql2/promise';
 
+const CACHE_TTL = 60_000;
+const cache = new Map();
+
+function getCachedValue(key) {
+  const entry = cache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) {
+    cache.delete(key);
+    return undefined;
+  }
+  return entry.value;
+}
+
+function setCachedValue(key, value, ttl = CACHE_TTL) {
+  cache.set(key, {
+    value,
+    expiresAt: Date.now() + ttl,
+  });
+}
+
+function clearCachedPrefix(prefix) {
+  for (const key of Array.from(cache.keys())) {
+    if (key.startsWith(prefix)) {
+      cache.delete(key);
+    }
+  }
+}
+
+function clearAllCache() {
+  cache.clear();
+}
+
 // Seed data
 export const seedCategories = [
   { slug: 'electronics', name: 'Electronics' },
@@ -238,9 +270,14 @@ async function ensureInitialized() {
 }
 
 export async function getCategories() {
+  const cacheKey = 'categories';
+  const cached = getCachedValue(cacheKey);
+  if (cached) return cached;
+
   await ensureInitialized();
   const pool = await poolPromise;
   const [rows] = await pool.query('SELECT slug, name FROM categories ORDER BY name');
+  setCachedValue(cacheKey, rows);
   return rows;
 }
 
@@ -258,6 +295,7 @@ export async function createCategory(name) {
   }
 
   await pool.query('INSERT INTO categories (slug, name) VALUES (?, ?)', [slug, trimmed]);
+  clearAllCache();
   return { slug, name: trimmed };
 }
 
@@ -271,6 +309,7 @@ export async function updateCategory(slug, name) {
   if (result.affectedRows === 0) {
     throw new Error('Category not found.');
   }
+  clearAllCache();
   return { slug, name: trimmed };
 }
 
@@ -282,6 +321,7 @@ export async function deleteCategory(slug) {
     if (result.affectedRows === 0) {
       throw new Error('Category not found.');
     }
+    clearAllCache();
   } catch (error) {
     if (error.code === 'ER_ROW_IS_REFERENCED_2') {
       throw new Error('Category is still in use by one or more products.');
@@ -317,6 +357,10 @@ export async function clearCartItems(cartId) {
 }
 
 export async function getProducts(category, q, limit) {
+  const cacheKey = `products:${category ?? ''}:${q ?? ''}:${limit ?? ''}`;
+  const cached = getCachedValue(cacheKey);
+  if (cached) return cached;
+
   await ensureInitialized();
   const pool = await poolPromise;
 
@@ -354,74 +398,93 @@ export async function getProducts(category, q, limit) {
   }
   const [rows] = await pool.query(query, params);
 
-  return rows.map((product) => ({
+  const products = rows.map((product) => ({
     ...product,
     isNew: Boolean(product.isNew),
     isFeatured: Boolean(product.isFeatured),
   }));
+
+  setCachedValue(cacheKey, products);
+  return products;
 }
 
 export async function getProductById(id) {
+  const cacheKey = `product:${id}`;
+  const cached = getCachedValue(cacheKey);
+  if (cached) return cached;
+
   await ensureInitialized();
   const pool = await poolPromise;
   const [rows] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
   const product = rows[0];
   if (!product) return undefined;
-  return {
+
+  const normalized = {
     ...product,
     isNew: Boolean(product.isNew),
     isFeatured: Boolean(product.isFeatured),
   };
+  setCachedValue(cacheKey, normalized);
+  return normalized;
 }
 
 export async function getProductsByIds(ids) {
   if (ids.length === 0) return [];
+
+  const normalizedIds = Array.from(new Set(ids));
+  const cacheKey = `productsByIds:${normalizedIds.join(',')}`;
+  const cached = getCachedValue(cacheKey);
+  if (cached) return cached;
+
   await ensureInitialized();
   const pool = await poolPromise;
-  const placeholders = ids.map(() => '?').join(', ');
-  const [rows] = await pool.query(`SELECT * FROM products WHERE id IN (${placeholders})`, ids);
-  return rows.map((product) => ({
+  const placeholders = normalizedIds.map(() => '?').join(', ');
+  const [rows] = await pool.query(`SELECT * FROM products WHERE id IN (${placeholders})`, normalizedIds);
+  const products = rows.map((product) => ({
     ...product,
     isNew: Boolean(product.isNew),
     isFeatured: Boolean(product.isFeatured),
   }));
+  setCachedValue(cacheKey, products);
+  return products;
 }
 
 export async function getHomePageProducts() {
+  const cacheKey = 'homePage';
+  const cached = getCachedValue(cacheKey);
+  if (cached) return cached;
+
   await ensureInitialized();
   const pool = await poolPromise;
 
-  const [featuredRows] = await pool.query(
-    'SELECT * FROM products WHERE isFeatured = 1 ORDER BY name LIMIT 8',
-  );
-  const featured = featuredRows.map((product) => ({
+  const [featuredRows, newRows, categoryStatsRows, categoryNames] = await Promise.all([
+    pool.query('SELECT * FROM products WHERE isFeatured = 1 ORDER BY name LIMIT 8'),
+    pool.query('SELECT * FROM products WHERE isNew = 1 ORDER BY name LIMIT 8'),
+    pool.query('SELECT category AS slug, COUNT(*) AS count FROM products GROUP BY category'),
+    pool.query('SELECT slug, name FROM categories'),
+  ]);
+
+  const featured = featuredRows[0].map((product) => ({
     ...product,
     isNew: Boolean(product.isNew),
     isFeatured: Boolean(product.isFeatured),
   }));
 
-  const [newRows] = await pool.query(
-    'SELECT * FROM products WHERE isNew = 1 ORDER BY name LIMIT 8',
-  );
-  const newArrivals = newRows.map((product) => ({
+  const newArrivals = newRows[0].map((product) => ({
     ...product,
     isNew: Boolean(product.isNew),
     isFeatured: Boolean(product.isFeatured),
   }));
 
-  const [categoryStatsRows] = await pool.query(
-    'SELECT category AS slug, COUNT(*) AS count FROM products GROUP BY category',
-  );
-  const categoryStats = categoryStatsRows.map((row) => ({
+  const categoryStats = categoryStatsRows[0].map((row) => ({
     slug: row.slug,
     name: row.slug,
     count: row.count,
   }));
 
-  const [categoryNames] = await pool.query('SELECT slug, name FROM categories');
-  const categoryMap = new Map(categoryNames.map((c) => [c.slug, c.name]));
+  const categoryMap = new Map(categoryNames[0].map((c) => [c.slug, c.name]));
 
-  return {
+  const result = {
     featured,
     newArrivals,
     categoryStats: categoryStats.map((stat) => ({
@@ -430,9 +493,16 @@ export async function getHomePageProducts() {
       count: stat.count,
     })),
   };
+
+  setCachedValue(cacheKey, result);
+  return result;
 }
 
 export async function getRelatedProducts(category, excludeId, limit = 4) {
+  const cacheKey = `related:${category}:${excludeId ?? ''}:${limit}`;
+  const cached = getCachedValue(cacheKey);
+  if (cached) return cached;
+
   await ensureInitialized();
   const pool = await poolPromise;
   const params = [category];
@@ -447,11 +517,13 @@ export async function getRelatedProducts(category, excludeId, limit = 4) {
     `SELECT * FROM products WHERE ${whereClause.join(' AND ')} ORDER BY name LIMIT ?`,
     params,
   );
-  return rows.map((product) => ({
+  const results = rows.map((product) => ({
     ...product,
     isNew: Boolean(product.isNew),
     isFeatured: Boolean(product.isFeatured),
   }));
+  setCachedValue(cacheKey, results);
+  return results;
 }
 
 export async function createProduct(product) {
@@ -471,6 +543,7 @@ export async function createProduct(product) {
       product.isFeatured ? 1 : 0,
     ],
   );
+  clearAllCache();
   return product;
 }
 
@@ -494,6 +567,7 @@ export async function updateProduct(product) {
   if (result.affectedRows === 0) {
     throw new Error('Product not found.');
   }
+  clearAllCache();
   return product;
 }
 
@@ -504,6 +578,7 @@ export async function deleteProduct(id) {
   if (result.affectedRows === 0) {
     throw new Error('Product not found.');
   }
+  clearAllCache();
 }
 
 export async function resetStore() {
@@ -538,6 +613,7 @@ export async function resetStore() {
       ]),
     );
   }
+  clearAllCache();
 }
 
 export async function createOrder(order) {
