@@ -76,10 +76,15 @@ type Tab = "overview" | "products" | "categories" | "orders" | "users" | "analyt
 function AdminPage() {
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>("overview");
-  const { data: products = [] } = useApiProducts();
-  const { data: categories = [] } = useApiCategories();
-  const { data: orders = [] } = useApiOrders();
-  const { data: users = [] } = useApiUsers();
+  const productsQuery = useApiProducts();
+  const categoriesQuery = useApiCategories();
+  const ordersQuery = useApiOrders();
+  const usersQuery = useApiUsers();
+  const products = productsQuery.data ?? [];
+  const categories = categoriesQuery.data ?? [];
+  const orders = ordersQuery.data ?? [];
+  const users = usersQuery.data ?? [];
+  const loading = productsQuery.isLoading || categoriesQuery.isLoading || ordersQuery.isLoading || usersQuery.isLoading;
   const queryClient = useQueryClient();
 
   const totalRevenue = orders.reduce((sum, order) => sum + (order.total || 0), 0);
@@ -166,36 +171,61 @@ function AdminPage() {
                 </div>
               </div>
 
-              <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <MetricCard
-                  title="Total Sales"
-                  value={formatPrice(Number(totalRevenue.toFixed(0)))}
-                  delta="+2.0%"
-                  description="Products vs last month"
-                  accent="from-sky-500 to-cyan-400"
-                />
-                <MetricCard
-                  title="Total Orders"
-                  value={totalOrders}
-                  delta="+12.4%"
-                  description="Orders vs last month"
-                  accent="from-emerald-500 to-lime-400"
-                />
-                <MetricCard
-                  title="Visitors"
-                  value={totalVisitors}
-                  delta="-2.0%"
-                  description="Users vs last month"
-                  accent="from-rose-500 to-fuchsia-400"
-                />
-                <MetricCard
-                  title="Total Products"
-                  value={totalProducts}
-                  delta="+12.1%"
-                  description="Products vs last month"
-                  accent="from-violet-500 to-indigo-400"
-                />
-              </div>
+              {loading ? (
+                <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="overflow-hidden rounded-[28px] border border-border bg-card/80 p-5 animate-pulse">
+                    <div className="h-4 w-32 bg-muted/40 rounded mb-4" />
+                    <div className="h-8 w-20 bg-muted/40 rounded" />
+                    <div className="mt-4 h-3 w-40 bg-muted/40 rounded" />
+                  </div>
+                  <div className="overflow-hidden rounded-[28px] border border-border bg-card/80 p-5 animate-pulse">
+                    <div className="h-4 w-32 bg-muted/40 rounded mb-4" />
+                    <div className="h-8 w-20 bg-muted/40 rounded" />
+                    <div className="mt-4 h-3 w-40 bg-muted/40 rounded" />
+                  </div>
+                  <div className="overflow-hidden rounded-[28px] border border-border bg-card/80 p-5 animate-pulse">
+                    <div className="h-4 w-32 bg-muted/40 rounded mb-4" />
+                    <div className="h-8 w-20 bg-muted/40 rounded" />
+                    <div className="mt-4 h-3 w-40 bg-muted/40 rounded" />
+                  </div>
+                  <div className="overflow-hidden rounded-[28px] border border-border bg-card/80 p-5 animate-pulse">
+                    <div className="h-4 w-32 bg-muted/40 rounded mb-4" />
+                    <div className="h-8 w-20 bg-muted/40 rounded" />
+                    <div className="mt-4 h-3 w-40 bg-muted/40 rounded" />
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <MetricCard
+                    title="Total Sales"
+                    value={formatPrice(Number(totalRevenue.toFixed(0)))}
+                    delta="+2.0%"
+                    description="Products vs last month"
+                    accent="from-sky-500 to-cyan-400"
+                  />
+                  <MetricCard
+                    title="Total Orders"
+                    value={totalOrders}
+                    delta="+12.4%"
+                    description="Orders vs last month"
+                    accent="from-emerald-500 to-lime-400"
+                  />
+                  <MetricCard
+                    title="Visitors"
+                    value={totalVisitors}
+                    delta="-2.0%"
+                    description="Users vs last month"
+                    accent="from-rose-500 to-fuchsia-400"
+                  />
+                  <MetricCard
+                    title="Total Products"
+                    value={totalProducts}
+                    delta="+12.1%"
+                    description="Products vs last month"
+                    accent="from-violet-500 to-indigo-400"
+                  />
+                </div>
+              )}
             </div>
 
             {tab === "overview" ? (
@@ -289,15 +319,15 @@ function AdminPage() {
                 </aside>
               </div>
             ) : tab === "products" ? (
-              <ProductsTab products={products} categories={categories} />
+              <ProductsTab products={products} categories={categories} loading={loading} />
             ) : tab === "categories" ? (
-              <CategoriesTab categories={categories} products={products} />
+              <CategoriesTab categories={categories} products={products} loading={loading} />
             ) : tab === "orders" ? (
-              <OrdersTab orders={orders} />
+              <OrdersTab orders={orders} loading={loading} />
             ) : tab === "users" ? (
-              <UsersTab />
+              <UsersTab loading={loading} />
             ) : (
-              <AnalyticsTab orders={orders} products={products} users={users} />
+              <AnalyticsTab orders={orders} products={products} users={users} loading={loading} />
             )}
           </main>
         </div>
@@ -383,11 +413,30 @@ function TabBtn({ active, onClick, children, icon }: { active: boolean; onClick:
 
 /* ---------------- Categories ---------------- */
 
-function CategoriesTab({ categories, products }: { categories: Category[]; products: Product[] }) {
+function CategoriesTab({ categories, products, loading }: { categories: Category[]; products: Product[]; loading: boolean }) {
   const [name, setName] = useState("");
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const queryClient = useQueryClient();
+
+  if (loading) {
+    return (
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="rounded-2xl border border-border bg-card p-6 animate-pulse">
+          <div className="h-4 w-40 rounded bg-muted/40 mb-4" />
+          <div className="space-y-3">
+            {[...Array(4)].map((_, index) => (
+              <div key={index} className="h-16 rounded-2xl bg-muted/40" />
+            ))}
+          </div>
+        </div>
+        <div className="h-fit rounded-2xl border border-border bg-card p-5 animate-pulse">
+          <div className="h-4 w-36 rounded bg-muted/40 mb-4" />
+          <div className="h-12 rounded-2xl bg-muted/40" />
+        </div>
+      </div>
+    );
+  }
 
   async function add() {
     const n = name.trim();
@@ -503,10 +552,26 @@ function CategoriesTab({ categories, products }: { categories: Category[]; produ
 
 /* ---------------- Products ---------------- */
 
-function ProductsTab({ products, categories }: { products: Product[]; categories: Category[] }) {
+function ProductsTab({ products, categories, loading }: { products: Product[]; categories: Category[]; loading: boolean }) {
   const [editing, setEditing] = useState<Product | null>(null);
   const [creating, setCreating] = useState(false);
   const queryClient = useQueryClient();
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-border bg-card p-6 animate-pulse">
+          <div className="h-4 w-40 rounded bg-muted/40 mb-4" />
+          <div className="h-4 w-32 rounded bg-muted/40 mb-4" />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[...Array(4)].map((_, index) => (
+              <div key={index} className="h-24 rounded-2xl bg-muted/40" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   async function remove(id: string) {
     if (!confirm("Delete this product?")) return;
@@ -592,7 +657,20 @@ function ProductsTab({ products, categories }: { products: Product[]; categories
   );
 }
 
-function OrdersTab({ orders }: { orders: OrderRecord[] }) {
+function OrdersTab({ orders, loading }: { orders: OrderRecord[]; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-10 rounded-2xl border border-border bg-card/80 p-4 animate-pulse" />
+        <div className="overflow-hidden rounded-2xl border border-border bg-card p-6 animate-pulse">
+          {[...Array(5)].map((index) => (
+            <div key={index} className="mb-3 h-14 rounded-2xl bg-muted/40 last:mb-0" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex justify-between gap-3">
@@ -634,9 +712,22 @@ function OrdersTab({ orders }: { orders: OrderRecord[] }) {
   );
 }
 
-function UsersTab() {
+function UsersTab({ loading }: { loading: boolean }) {
   const queryClient = useQueryClient();
   const { data: users = [] } = useApiUsers();
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-10 rounded-2xl border border-border bg-card/80 p-4 animate-pulse" />
+        <div className="rounded-2xl border border-border bg-card p-6 animate-pulse">
+          {[...Array(5)].map((index) => (
+            <div key={index} className="mb-3 h-14 rounded-2xl bg-muted/40 last:mb-0" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   async function setRole(email: string, role: "admin" | "customer") {
     try {
@@ -698,7 +789,26 @@ function UsersTab() {
   );
 }
 
-function OverviewTab({ orders, products, users }: { orders: OrderRecord[]; products: Product[]; users: { email: string }[] }) {
+function OverviewTab({ orders, products, users, loading }: { orders: OrderRecord[]; products: Product[]; users: { email: string }[]; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-4">
+          {[...Array(4)].map((index) => (
+            <div key={index} className="h-28 rounded-2xl border border-border bg-card p-4 animate-pulse" />
+          ))}
+        </div>
+        <div className="grid gap-6 xl:grid-cols-[1.6fr_0.9fr]">
+          <div className="h-80 rounded-2xl border border-border bg-card p-6 animate-pulse" />
+          <div className="space-y-6">
+            <div className="h-64 rounded-2xl border border-border bg-card p-5 animate-pulse" />
+            <div className="h-64 rounded-2xl border border-border bg-card p-5 animate-pulse" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const totalRevenue = orders.reduce((sum, order) => sum + (order.total || 0), 0);
   const totalOrders = orders.length;
   const totalProducts = products.length;
@@ -764,7 +874,7 @@ function OverviewTab({ orders, products, users }: { orders: OrderRecord[]; produ
             </div>
             <div className="mt-5 space-y-4">
               {topCategories.map((category) => (
-                <div key={category.slug} className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3">
+                <div key={category.slug} className="flex items-center justify-between rounded-2xl border border-border bg-card/80 px-4 py-3">
                   <div>
                     <p className="font-medium">{category.slug}</p>
                     <p className="text-xs text-muted-foreground">{category.count} products</p>
@@ -785,7 +895,7 @@ function OverviewTab({ orders, products, users }: { orders: OrderRecord[]; produ
             </div>
             <div className="mt-5 space-y-3">
               {recentOrders.map((order) => (
-                <div key={order.id} className="rounded-2xl border border-border bg-surface p-4">
+                <div key={order.id} className="rounded-2xl border border-border bg-card/80 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="font-medium">{order.orderNumber}</p>
@@ -918,7 +1028,22 @@ function buildCategoryStats(products: Product[], limit: number) {
     .slice(0, limit);
 }
 
-function AnalyticsTab({ orders, products, users }: { orders: OrderRecord[]; products: Product[]; users: { email: string }[] }) {
+function AnalyticsTab({ orders, products, users, loading }: { orders: OrderRecord[]; products: Product[]; users: { email: string }[]; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid gap-6 xl:grid-cols-[1.75fr_1fr]">
+          <div className="h-80 rounded-2xl border border-border bg-card p-6 animate-pulse" />
+          <div className="h-80 rounded-2xl border border-border bg-card p-6 animate-pulse" />
+        </div>
+        <div className="grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
+          <div className="h-64 rounded-2xl border border-border bg-card p-5 animate-pulse" />
+          <div className="h-64 rounded-2xl border border-border bg-card p-5 animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
   const totalRevenue = orders.reduce((s, o) => s + (o.total || 0), 0);
   const avgOrder = orders.length ? totalRevenue / orders.length : 0;
   const totalOrders = orders.length;
@@ -983,7 +1108,7 @@ function AnalyticsTab({ orders, products, users }: { orders: OrderRecord[]; prod
             </div>
             <div className="mt-5 space-y-4">
               {topCategories.map((category) => (
-                <div key={category.slug} className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3">
+                <div key={category.slug} className="flex items-center justify-between rounded-2xl border border-border bg-card/80 px-4 py-3">
                   <div>
                     <p className="font-medium">{category.slug}</p>
                     <p className="text-xs text-muted-foreground">{category.count} products</p>
@@ -1003,11 +1128,11 @@ function AnalyticsTab({ orders, products, users }: { orders: OrderRecord[]; prod
               <span className="rounded-full bg-muted px-2 py-1 text-[11px] uppercase tracking-[0.15em] text-muted-foreground">Live</span>
             </div>
             <div className="mt-5 space-y-3">
-              <div className="rounded-2xl border border-border bg-surface p-4">
+              <div className="rounded-2xl border border-border bg-card/80 p-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Total users</p>
                 <p className="mt-2 text-2xl font-semibold">{totalUsers}</p>
               </div>
-              <div className="rounded-2xl border border-border bg-surface p-4">
+              <div className="rounded-2xl border border-border bg-card/80 p-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">New orders in 7d</p>
                 <p className="mt-2 text-2xl font-semibold">{ordersByDay.reduce((sum, point) => sum + point.value, 0)}</p>
               </div>
@@ -1048,7 +1173,7 @@ function AnalyticsTab({ orders, products, users }: { orders: OrderRecord[]; prod
           </div>
           <div className="mt-5 space-y-3">
             {recentOrders.map((order) => (
-              <div key={order.id} className="rounded-2xl border border-border bg-surface p-4">
+              <div key={order.id} className="rounded-2xl border border-border bg-card/80 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="font-medium">{order.orderNumber}</p>
@@ -1201,3 +1326,4 @@ function IconBtn({ children, onClick, title, danger }: { children: React.ReactNo
 
 const inputCls =
   "w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
+
