@@ -263,7 +263,7 @@ export function useApiOrders() {
     queryKey: ["orders"],
     queryFn: fetchOrders,
     staleTime: 1000 * 60 * 2,
-    initialData: [] as OrderRecord[],
+    placeholderData: [] as OrderRecord[],
     enabled: true,
   });
 }
@@ -274,7 +274,6 @@ export function useApiAdminDashboard() {
     queryFn: fetchAdminDashboard,
     staleTime: 1000 * 60,
     gcTime: 1000 * 60 * 10,
-    placeholderData: { products: seedProducts, categories: seedCategories, orders: [] } as AdminDashboardData,
     enabled: true,
   });
 }
@@ -285,7 +284,7 @@ export function useApiCategories() {
     queryFn: fetchCategories,
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 60,
-    initialData: [] as Category[],
+    placeholderData: [] as Category[],
     enabled: true,
   });
 }
@@ -296,7 +295,7 @@ export function useApiProducts(category?: string, q?: string, limit?: number) {
     queryFn: () => fetchProducts(category, q, limit),
     staleTime: 1000 * 60 * 10,
     gcTime: 1000 * 60 * 30,
-    initialData: [] as Product[],
+    placeholderData: [] as Product[],
     enabled: true,
   });
 }

@@ -1,5 +1,15 @@
+import { createHash } from "crypto";
 import { createPool, type Pool, type RowDataPacket } from "mysql2/promise";
 import { seedCategories, seedProducts, type Category, type Product, slugify } from "@/lib/products";
+
+type Role = "customer" | "admin";
+
+export type UserRow = {
+  email: string;
+  name: string;
+  role: Role;
+  password: string;
+};
 
 type ProductRow = Omit<Product, "isNew" | "isFeatured"> & {
   isNew: number;
@@ -76,7 +86,19 @@ async function initSchema(pool: Pool) {
       FOREIGN KEY (category) REFERENCES categories(slug)
     )`);
 
-  await pool.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS stock INT NOT NULL DEFAULT 0`);
+  try {
+    await pool.query('ALTER TABLE products ADD COLUMN stock INT NOT NULL DEFAULT 0');
+  } catch (err) {
+    if (
+      !(
+        err &&
+        (err.code === 'ER_DUP_FIELDNAME' || (typeof err.message === 'string' && err.message.includes('Duplicate column')))
+      )
+    ) {
+      throw err;
+    }
+    // ignore duplicate column errors for older MySQL versions
+  }
 
   const [categoryIndexRows] = await pool.query<RowDataPacket[]>(
     "SHOW INDEX FROM products WHERE Key_name = 'idx_products_category'",
@@ -123,6 +145,23 @@ async function initSchema(pool: Pool) {
       FOREIGN KEY (orderId) REFERENCES orders(id) ON DELETE CASCADE,
       FOREIGN KEY (productId) REFERENCES products(id) ON DELETE CASCADE
     )`);
+
+  await pool.query(`CREATE TABLE IF NOT EXISTS users (
+      email VARCHAR(191) PRIMARY KEY,
+      name TEXT NOT NULL,
+      role VARCHAR(50) NOT NULL,
+      password VARCHAR(191) NOT NULL
+    )`);
+
+  const [userRows] = await pool.query<RowDataPacket[]>("SELECT COUNT(*) AS count FROM users");
+  const userCount = Number(userRows[0]?.count ?? 0);
+  if (userCount === 0) {
+    const hashedPassword = hashPassword("admin123");
+    await pool.query(
+      `INSERT INTO users (email, name, role, password) VALUES (?, ?, ?, ?)`,
+      ["admin@shopease.com", "Store Admin", "admin", hashedPassword],
+    );
+  }
 
   const [categoryRows] = await pool.query<RowDataPacket[]>("SELECT COUNT(*) AS count FROM categories");
   const categoryCount = Number(categoryRows[0]?.count ?? 0);
@@ -446,6 +485,71 @@ export async function deleteProduct(id: string): Promise<void> {
   }
 }
 
+export function hashPassword(password: string) {
+  return createHash("sha256").update(password).digest("hex");
+}
+
+export function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+export async function getUserByEmail(email: string): Promise<UserRow | undefined> {
+  await ensureInitialized();
+  const pool = await poolPromise;
+  const normalizedEmail = normalizeEmail(email);
+  const [rows] = await pool.query<RowDataPacket[]>("SELECT email, name, role, password FROM users WHERE email = ?", [normalizedEmail]);
+  return (rows as UserRow[])[0];
+}
+
+export async function getUsers(): Promise<Array<{ email: string; name: string; role: Role }>> {
+  await ensureInitialized();
+  const pool = await poolPromise;
+  const [rows] = await pool.query<RowDataPacket[]>("SELECT email, name, role FROM users ORDER BY email");
+  return rows as Array<{ email: string; name: string; role: Role }>;
+}
+
+export async function createUser(name: string, email: string, password: string): Promise<{ email: string; name: string; role: Role }> {
+  const normalizedEmail = normalizeEmail(email);
+  const trimmedName = name.trim();
+  if (!trimmedName) throw new Error("Name is required.");
+  if (!normalizedEmail || !normalizedEmail.includes("@")) throw new Error("Valid email is required.");
+  if (password.length < 6) throw new Error("Password must be at least 6 characters.");
+
+  await ensureInitialized();
+  const pool = await poolPromise;
+  const [existing] = await pool.query<RowDataPacket[]>("SELECT email FROM users WHERE email = ?", [normalizedEmail]);
+  if ((existing as RowDataPacket[]).length > 0) {
+    throw new Error("An account with this email already exists");
+  }
+
+  const hashedPassword = hashPassword(password);
+  await pool.query("INSERT INTO users (email, name, role, password) VALUES (?, ?, ?, ?)", [normalizedEmail, trimmedName, "customer", hashedPassword]);
+  return { email: normalizedEmail, name: trimmedName, role: "customer" };
+}
+
+export async function updateUserRole(email: string, role: Role): Promise<{ email: string; name: string; role: Role }> {
+  const normalizedEmail = normalizeEmail(email);
+  await ensureInitialized();
+  const pool = await poolPromise;
+  const [result] = await pool.query<import("mysql2").OkPacket>("UPDATE users SET role = ? WHERE email = ?", [role, normalizedEmail]);
+  if (result.affectedRows === 0) {
+    throw new Error("User not found.");
+  }
+  const user = await getUserByEmail(normalizedEmail);
+  if (!user) throw new Error("User not found.");
+  return { email: user.email, name: user.name, role: user.role };
+}
+
+export async function deleteUserByEmail(email: string): Promise<void> {
+  const normalizedEmail = normalizeEmail(email);
+  await ensureInitialized();
+  const pool = await poolPromise;
+  const [result] = await pool.query<import("mysql2").OkPacket>("DELETE FROM users WHERE email = ?", [normalizedEmail]);
+  if (result.affectedRows === 0) {
+    throw new Error("User not found.");
+  }
+}
+
 export async function resetStore(): Promise<void> {
   await ensureInitialized();
   const pool = await poolPromise;
@@ -454,7 +558,7 @@ export async function resetStore(): Promise<void> {
   await pool.query("DELETE FROM cart_items");
   await pool.query("DELETE FROM products");
   await pool.query("DELETE FROM categories");
-
+  
   if (seedCategories.length > 0) {
     await pool.query(
       `INSERT INTO categories (slug, name) VALUES ${seedCategories.map(() => "(?, ?)").join(", ")}`,

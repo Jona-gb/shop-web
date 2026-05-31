@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 
 export type Role = "customer" | "admin";
 export interface AuthUser {
+  id: number;
   email: string;
   name: string;
   role: Role;
@@ -16,29 +17,6 @@ interface AuthCtx {
 
 const Ctx = createContext<AuthCtx | null>(null);
 const KEY = "shopease.auth.user";
-const USERS_KEY = "shopease.auth.users";
-
-interface StoredUser extends AuthUser {
-  password: string;
-}
-
-function loadUsers(): StoredUser[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(USERS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  // Seed an admin account
-  const seed: StoredUser[] = [
-    { email: "admin@shopease.com", name: "Store Admin", role: "admin", password: "admin123" },
-  ];
-  localStorage.setItem(USERS_KEY, JSON.stringify(seed));
-  return seed;
-}
-
-function saveUsers(users: StoredUser[]) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -57,24 +35,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const login: AuthCtx["login"] = async (email, password) => {
-    const users = loadUsers();
-    const found = users.find((u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-    if (!found) throw new Error("Invalid email or password");
-    const safe: AuthUser = { email: found.email, name: found.name, role: found.role };
-    persist(safe);
-    return safe;
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || "Could not sign in");
+    }
+
+    const user = await response.json();
+    persist(user);
+    return user;
   };
 
   const signup: AuthCtx["signup"] = async (name, email, password) => {
-    const users = loadUsers();
-    if (users.some((u) => u.email.toLowerCase() === email.toLowerCase())) {
-      throw new Error("An account with this email already exists");
+    const response = await fetch("/api/auth/signup", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, name, password }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || "Could not create account");
     }
-    const created: StoredUser = { name, email, password, role: "customer" };
-    saveUsers([...users, created]);
-    const safe: AuthUser = { email, name, role: "customer" };
-    persist(safe);
-    return safe;
+
+    const user = await response.json();
+    persist(user);
+    return user;
   };
 
   const logout = () => persist(null);

@@ -18,6 +18,8 @@ import {
   clearCartItems,
   getRelatedProducts,
   getOrderByOrderNumber,
+  createUser,
+  authenticateUser,
 } from './db.js';
 
 // Checkout controller
@@ -94,17 +96,67 @@ function getCartIdFromRequest(request) {
 }
 
 async function parseRequestBody(request) {
+  // Accept Express-style parsed body or a Fetch Request with .json()
   try {
-    return await request.json();
-  } catch {
-    return null;
-  }
+    console.log('parseRequestBody incoming:', {
+      hasBody: request && typeof request.body !== 'undefined',
+      bodyType: request && request.body ? typeof request.body : null,
+      hasJsonFn: request && request.body && typeof request.body.json === 'function',
+      hasTopJson: request && typeof request.json === 'function',
+    });
+  } catch (e) {}
+  try {
+    if (request && typeof request.body !== 'undefined') {
+      // If body looks like a wrapper with a json() helper, call it
+      if (request.body && typeof request.body === 'object' && typeof request.body.json === 'function') {
+        return await request.body.json();
+      }
+      return request.body;
+    }
+  } catch {}
+
+  try {
+    if (request && typeof request.json === 'function') return await request.json();
+  } catch {}
+
+  return null;
 }
+
 
 // Main API handler
 export async function handleApiRequest(request) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, '');
+
+  // Auth endpoints
+  if (path === '/api/auth/signup' && request.method === 'POST') {
+    const body = await parseRequestBody(request);
+    if (!body || typeof body.email !== 'string' || typeof body.name !== 'string' || typeof body.password !== 'string') {
+      return badRequest({ error: 'Email, name, and password are required.' });
+    }
+    if (body.password.length < 6) {
+      return badRequest({ error: 'Password must be at least 6 characters.' });
+    }
+    try {
+      const user = await createUser(body.email.toLowerCase().trim(), body.name.trim(), body.password);
+      return json(user, 201);
+    } catch (err) {
+      return badRequest({ error: err instanceof Error ? err.message : 'Could not create account' });
+    }
+  }
+
+  if (path === '/api/auth/login' && request.method === 'POST') {
+    const body = await parseRequestBody(request);
+    if (!body || typeof body.email !== 'string' || typeof body.password !== 'string') {
+      return badRequest({ error: 'Email and password are required.' });
+    }
+    try {
+      const user = await authenticateUser(body.email.toLowerCase().trim(), body.password);
+      return json(user);
+    } catch (err) {
+      return badRequest({ error: err instanceof Error ? err.message : 'Could not sign in' });
+    }
+  }
 
   if (path === '/api/categories' && request.method === 'GET') {
     return json(await getCategories());
@@ -186,6 +238,9 @@ export async function handleApiRequest(request) {
     if (!body || typeof body.id !== 'string') {
       return badRequest({ error: 'Product data is required.' });
     }
+    if (typeof body.stock !== 'number' || !Number.isInteger(body.stock) || body.stock < 0) {
+      return badRequest({ error: 'Product stock must be a non-negative integer.' });
+    }
     const product = await createProduct(body);
     return json(product, 201);
   }
@@ -195,6 +250,9 @@ export async function handleApiRequest(request) {
     const body = await parseRequestBody(request);
     if (!body || typeof body.id !== 'string') {
       return badRequest({ error: 'Product data is required.' });
+    }
+    if (typeof body.stock !== 'number' || !Number.isInteger(body.stock) || body.stock < 0) {
+      return badRequest({ error: 'Product stock must be a non-negative integer.' });
     }
     const product = await updateProduct({ ...body, id });
     return json(product);

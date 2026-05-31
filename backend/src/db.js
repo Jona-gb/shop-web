@@ -1,4 +1,5 @@
 import { createPool } from 'mysql2/promise';
+import bcrypt from 'bcrypt';
 
 const CACHE_TTL = 60_000;
 const cache = new Map();
@@ -45,6 +46,7 @@ export const seedProducts = [
     name: 'Wireless Headphones',
     category: 'electronics',
     price: 89.99,
+    stock: 12,
     image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&h=500&fit=crop',
     description: 'Premium wireless headphones with noise cancellation',
     isNew: true,
@@ -55,6 +57,7 @@ export const seedProducts = [
     name: 'USB-C Cable',
     category: 'accessories',
     price: 14.99,
+    stock: 30,
     image: 'https://images.unsplash.com/photo-1625948515291-69613efd103f?w=500&h=500&fit=crop',
     description: 'Durable USB-C charging and data cable',
     isNew: false,
@@ -65,6 +68,7 @@ export const seedProducts = [
     name: 'Phone Stand',
     category: 'gadgets',
     price: 19.99,
+    stock: 18,
     image: 'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=500&h=500&fit=crop',
     description: 'Adjustable phone stand for any device',
     isNew: true,
@@ -75,6 +79,7 @@ export const seedProducts = [
     name: 'Power Bank',
     category: 'gadgets',
     price: 39.99,
+    stock: 14,
     image: 'https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=500&h=500&fit=crop',
     description: '20000mAh portable power bank',
     isNew: false,
@@ -85,6 +90,7 @@ export const seedProducts = [
     name: 'Screen Protector',
     category: 'accessories',
     price: 9.99,
+    stock: 50,
     image: 'https://images.unsplash.com/photo-1613141065903-85a20c25910a?w=500&h=500&fit=crop',
     description: 'Tempered glass screen protector',
     isNew: false,
@@ -95,6 +101,7 @@ export const seedProducts = [
     name: 'Wireless Mouse',
     category: 'electronics',
     price: 49.99,
+    stock: 22,
     image: 'https://images.unsplash.com/photo-1527814050087-3793815479db?w=500&h=500&fit=crop',
     description: 'Silent wireless mouse with precision tracking',
     isNew: true,
@@ -105,6 +112,7 @@ export const seedProducts = [
     name: 'Mechanical Keyboard',
     category: 'electronics',
     price: 129.99,
+    stock: 10,
     image: 'https://images.unsplash.com/photo-1587829191301-723ee259d07e?w=500&h=500&fit=crop',
     description: 'RGB mechanical keyboard with custom switches',
     isNew: false,
@@ -115,6 +123,7 @@ export const seedProducts = [
     name: 'Phone Case',
     category: 'accessories',
     price: 24.99,
+    stock: 40,
     image: 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=500&h=500&fit=crop',
     description: 'Durable protective phone case',
     isNew: false,
@@ -178,12 +187,27 @@ async function initSchema(pool) {
       name TEXT NOT NULL,
       category VARCHAR(191) NOT NULL,
       price DOUBLE NOT NULL,
+      stock INT NOT NULL DEFAULT 0,
       image TEXT NOT NULL,
       description TEXT NOT NULL,
       isNew TINYINT(1) NOT NULL,
       isFeatured TINYINT(1) NOT NULL,
       FOREIGN KEY (category) REFERENCES categories(slug)
     )`);
+
+  try {
+    await pool.query('ALTER TABLE products ADD COLUMN stock INT NOT NULL DEFAULT 0');
+  } catch (err) {
+    if (
+      !(
+        err &&
+        (err.code === 'ER_DUP_FIELDNAME' || (typeof err.message === 'string' && err.message.includes('Duplicate column')))
+      )
+    ) {
+      throw err;
+    }
+    // ignore duplicate column errors for older MySQL versions
+  }
 
   const [categoryIndexRows] = await pool.query(
     "SHOW INDEX FROM products WHERE Key_name = 'idx_products_category'",
@@ -231,6 +255,16 @@ async function initSchema(pool) {
       FOREIGN KEY (productId) REFERENCES products(id) ON DELETE CASCADE
     )`);
 
+  // Users table for authentication
+  await pool.query(`CREATE TABLE IF NOT EXISTS users (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      email VARCHAR(191) UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      passwordHash TEXT NOT NULL,
+      role ENUM('customer','admin') NOT NULL DEFAULT 'customer',
+      createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`);
+
   const [categoryRows] = await pool.query('SELECT COUNT(*) AS count FROM categories');
   const categoryCount = Number(categoryRows[0]?.count ?? 0);
   if (categoryCount === 0) {
@@ -244,19 +278,34 @@ async function initSchema(pool) {
   const productCount = Number(productRows[0]?.count ?? 0);
   if (productCount === 0) {
     await pool.query(
-      `INSERT INTO products (id, name, category, price, image, description, isNew, isFeatured)
-       VALUES ${seedProducts.map(() => '(?, ?, ?, ?, ?, ?, ?, ?)').join(', ')}`,
+      `INSERT INTO products (id, name, category, price, stock, image, description, isNew, isFeatured)
+       VALUES ${seedProducts.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ')}`,
       seedProducts.flatMap((product) => [
         product.id,
         product.name,
         product.category,
         product.price,
+        product.stock,
         product.image,
         product.description,
         product.isNew ? 1 : 0,
         product.isFeatured ? 1 : 0,
       ]),
     );
+  }
+
+  // Seed admin user if none exist
+  const [userRows] = await pool.query('SELECT COUNT(*) AS count FROM users');
+  const userCount = Number(userRows[0]?.count ?? 0);
+  if (userCount === 0) {
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    const hash = await bcrypt.hash(adminPassword, 10);
+    await pool.query('INSERT INTO users (email, name, passwordHash, role) VALUES (?, ?, ?, ?)', [
+      'admin@shopease.com',
+      'Store Admin',
+      hash,
+      'admin',
+    ]);
   }
 }
 
@@ -335,6 +384,37 @@ export async function getCartItems(cartId) {
   const pool = await poolPromise;
   const [rows] = await pool.query('SELECT cartId, productId, qty FROM cart_items WHERE cartId = ?', [cartId]);
   return rows;
+}
+
+export async function createUser(email, name, password, role = 'customer') {
+  const trimmedEmail = String(email).trim().toLowerCase();
+  const trimmedName = String(name).trim();
+  if (!trimmedEmail || !trimmedName || !password) throw new Error('Email, name and password are required.');
+  await ensureInitialized();
+  const pool = await poolPromise;
+  const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [trimmedEmail]);
+  if (existing.length > 0) throw new Error('An account with this email already exists');
+  const passwordHash = await bcrypt.hash(password, 10);
+  const [result] = await pool.query('INSERT INTO users (email, name, passwordHash, role) VALUES (?, ?, ?, ?)', [
+    trimmedEmail,
+    trimmedName,
+    passwordHash,
+    role,
+  ]);
+  return { id: String(result.insertId), email: trimmedEmail, name: trimmedName, role };
+}
+
+export async function authenticateUser(email, password) {
+  const trimmedEmail = String(email).trim().toLowerCase();
+  if (!trimmedEmail || !password) throw new Error('Email and password are required.');
+  await ensureInitialized();
+  const pool = await poolPromise;
+  const [rows] = await pool.query('SELECT id, email, name, passwordHash, role FROM users WHERE email = ?', [trimmedEmail]);
+  if (rows.length === 0) throw new Error('Invalid email or password');
+  const user = rows[0];
+  const ok = await bcrypt.compare(password, user.passwordHash);
+  if (!ok) throw new Error('Invalid email or password');
+  return { id: String(user.id), email: user.email, name: user.name, role: user.role };
 }
 
 export async function setCartItems(cartId, items) {
@@ -530,13 +610,14 @@ export async function createProduct(product) {
   await ensureInitialized();
   const pool = await poolPromise;
   await pool.query(
-    `INSERT INTO products (id, name, category, price, image, description, isNew, isFeatured)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO products (id, name, category, price, stock, image, description, isNew, isFeatured)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       product.id,
       product.name,
       product.category,
       product.price,
+      product.stock,
       product.image,
       product.description,
       product.isNew ? 1 : 0,
@@ -551,12 +632,13 @@ export async function updateProduct(product) {
   await ensureInitialized();
   const pool = await poolPromise;
   const [result] = await pool.query(
-    `UPDATE products SET name = ?, category = ?, price = ?, image = ?, description = ?, isNew = ?, isFeatured = ?
+    `UPDATE products SET name = ?, category = ?, price = ?, stock = ?, image = ?, description = ?, isNew = ?, isFeatured = ?
      WHERE id = ?`,
     [
       product.name,
       product.category,
       product.price,
+      product.stock,
       product.image,
       product.description,
       product.isNew ? 1 : 0,
@@ -599,13 +681,14 @@ export async function resetStore() {
 
   if (seedProducts.length > 0) {
     await pool.query(
-      `INSERT INTO products (id, name, category, price, image, description, isNew, isFeatured)
-       VALUES ${seedProducts.map(() => '(?, ?, ?, ?, ?, ?, ?, ?)').join(', ')}`,
+      `INSERT INTO products (id, name, category, price, stock, image, description, isNew, isFeatured)
+       VALUES ${seedProducts.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ')}`,
       seedProducts.flatMap((product) => [
         product.id,
         product.name,
         product.category,
         product.price,
+        product.stock,
         product.image,
         product.description,
         product.isNew ? 1 : 0,

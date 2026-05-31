@@ -3,9 +3,6 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Activity, Plus, Pencil, Trash2, X, Tag, Package, List, Save, Lock, LayoutDashboard, Search, Bell, MessageSquare, Settings, LogOut, ChevronRight, Users, BarChart, FileText, MoreVertical, CalendarDays, Globe2, ShoppingBag, ShoppingCart, ReceiptText, PackageSearch } from "lucide-react";
 import {
-  useApiCategories,
-  useApiProducts,
-  useApiOrders,
   fetchCreateCategory,
   fetchUpdateCategory,
   fetchDeleteCategory,
@@ -16,8 +13,6 @@ import {
   newId,
   slugify,
   categoryName,
-  seedCategories,
-  seedProducts,
   type Category,
   type Product,
   type OrderRecord,
@@ -93,14 +88,15 @@ export function AdminPage() {
   const categories = dashboardQuery.data?.categories ?? [];
   const orders = dashboardQuery.data?.orders ?? [];
   const users = usersQuery.data ?? [];
-  const displayProducts = products.length > 0 ? products : seedProducts;
-  const displayCategories = categories.length > 0 ? categories : seedCategories;
-  const dashboardIsPlaceholder = Boolean(dashboardQuery.isPlaceholderData);
-  const dashboardLoading = dashboardQuery.isFetching && !dashboardQuery.data;
+  // Always use actual database data, never fall back to seed data
+  const displayProducts = products;
+  const displayCategories = categories;
+  // Loading is when fetching AND we only have placeholder data or no data yet
+  const dashboardLoading = dashboardQuery.isFetching && (dashboardQuery.isPlaceholderData || !dashboardQuery.data);
   const productsLoading = dashboardLoading;
   const categoriesLoading = dashboardLoading;
-  const ordersLoading = dashboardQuery.isFetching && (dashboardIsPlaceholder || orders.length === 0);
-  const usersLoading = usersQuery.isFetching && users.length === 0;
+  const ordersLoading = dashboardQuery.isFetching && dashboardQuery.isPlaceholderData;
+  const usersLoading = usersQuery.isFetching && usersQuery.isPlaceholderData;
   const productsError = dashboardQuery.isError;
 
   const totalRevenue = orders.reduce((sum, order) => sum + (order.total || 0), 0);
@@ -564,7 +560,7 @@ function CategoriesTab({ categories, products, loading }: { categories: Category
                   ) : (
                     <div className="flex-1">
                       <p className="text-sm font-medium">{c.name}</p>
-                      <p className="text-xs text-muted-foreground">/{c.slug} Â· {count} product{count === 1 ? "" : "s"}</p>
+                      <p className="text-xs text-muted-foreground">/{c.slug} · {count} product{count === 1 ? "" : "s"}</p>
                     </div>
                   )}
                   <div className="flex gap-1">
@@ -731,15 +727,17 @@ function ProductsTab({ products, categories, loading, hasError }: { products: Pr
         ) : (
           <ul className="divide-y divide-border">
             {products.map((p) => (
-              <li key={p.id} className="flex min-w-0 gap-4 p-4">
+              <li key={p.id} className="flex min-w-0 flex-wrap items-center gap-4 p-4 sm:flex-nowrap">
                 <img src={p.image} alt={p.name} className="h-20 w-20 shrink-0 rounded-xl bg-slate-100 object-cover" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{p.name}</p>
-                  <p className="text-xs text-muted-foreground">{categoryName(p.category, categories)} Â· {formatPrice(p.price)}</p>
-                </div>
-                <div className="hidden gap-1 sm:flex">
-                  {p.isFeatured && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Featured</span>}
-                  {p.isNew && <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">New</span>}
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                    <span className="truncate">{categoryName(p.category, categories)} · {formatPrice(p.price)}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {p.isFeatured && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Featured</span>}
+                      {p.isNew && <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">New</span>}
+                    </div>
+                  </div>
                 </div>
                 <div className="flex gap-1">
                   <IconBtn onClick={() => setEditing(p)} title="Edit"><Pencil className="h-4 w-4" /></IconBtn>
@@ -1000,7 +998,7 @@ function OverviewTab({ orders, products, users, loading }: { orders: OrderRecord
                     </div>
                     <p className="text-sm font-semibold">{formatPrice(order.total || 0)}</p>
                   </div>
-                  <p className="mt-2 text-sm text-muted-foreground">{order.name} Â· {order.email}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{order.name} · {order.email}</p>
                 </div>
               ))}
             </div>
@@ -1278,7 +1276,7 @@ function AnalyticsTab({ orders, products, users, loading }: { orders: OrderRecor
                   </div>
                   <p className="text-sm font-semibold">{formatPrice(order.total || 0)}</p>
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">{order.name} Â· {order.email}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{order.name} · {order.email}</p>
               </div>
             ))}
           </div>

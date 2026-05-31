@@ -42,7 +42,7 @@ export function useApiUsers() {
     queryKey: ["users"],
     queryFn: fetchUsers,
     staleTime: 1000 * 60 * 2,
-    initialData: [] as StoredUser[],
+    placeholderData: [] as StoredUser[],
     enabled: true,
   });
 }

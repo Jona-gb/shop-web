@@ -32,16 +32,22 @@ async function fetchCartItems(): Promise<CartItem[]> {
 }
 
 async function persistCartItems(items: CartItem[]) {
-  await fetch("/api/cart", {
+  const response = await fetch("/api/cart", {
     method: "POST",
     credentials: "same-origin",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ items }),
   });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Cart persistence failed: ${response.status} ${response.statusText} ${errorText}`);
+  }
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [cartLoaded, setCartLoaded] = useState(false);
   const productIds = items.map((item) => item.productId);
   const { data: products = [] } = useApiProductsByIds(productIds);
 
@@ -53,6 +59,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (mounted) setItems(items);
     }).catch(() => {
       if (mounted) setItems([]);
+    }).finally(() => {
+      if (mounted) setCartLoaded(true);
     });
 
     return () => {
@@ -61,11 +69,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    persistCartItems(items).catch(() => {
-      // swallow persistence errors; cart state remains in memory until retry
+    if (typeof window === "undefined" || !cartLoaded) return;
+    persistCartItems(items).catch((error) => {
+      console.error("Failed to persist cart items:", error);
     });
-  }, [items]);
+  }, [cartLoaded, items]);
 
   const value = useMemo<CartCtx>(() => {
     const detailed = buildDetailedCart(items, products);
@@ -106,5 +114,5 @@ export function useCart() {
 }
 
 export function formatPrice(n: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "GHc", maximumFractionDigits: 0 }).format(n);
 }

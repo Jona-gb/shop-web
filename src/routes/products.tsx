@@ -27,15 +27,24 @@ function ProductsPage() {
   const {
     data: products = [],
     isLoading: productsLoading,
+    isFetching: productsFetching,
     isError: productsError,
   } = useApiProducts(category, q);
   const {
     data: categories = [],
     isLoading: categoriesLoading,
+    isFetching: categoriesFetching,
     isError: categoriesError,
   } = useApiCategories();
 
   const filtered = products;
+  const isLoading =
+    productsLoading ||
+    categoriesLoading ||
+    (productsFetching && products.length === 0) ||
+    (categoriesFetching && categories.length === 0);
+  const hasError = productsError || categoriesError;
+  const isEmpty = !isLoading && !hasError && filtered.length === 0;
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -76,28 +85,30 @@ function ProductsPage() {
         ))}
       </div>
 
-      {(productsLoading || categoriesLoading) && (
+      {isLoading && (
         <div className="mt-24 text-center">
-          <p className="font-display text-xl font-semibold">Loading products�</p>
+          <p className="font-display text-xl font-semibold">Loading products…</p>
           <p className="mt-2 text-sm text-muted-foreground">Please wait while we load the latest items.</p>
         </div>
       )}
 
-      {(productsError || categoriesError) && (
+      {hasError && (
         <div className="mt-24 text-center text-destructive">
           <p className="font-display text-xl font-semibold">Unable to load products</p>
           <p className="mt-2 text-sm text-muted-foreground">Try refreshing the page.</p>
         </div>
       )}
 
-      {!productsLoading && !categoriesLoading && !productsError && !categoriesError && filtered.length === 0 ? (
+      {isEmpty ? (
         <div className="mt-24 text-center">
           <p className="font-display text-xl font-semibold">No products found</p>
           <p className="mt-2 text-sm text-muted-foreground">Try a different search or category.</p>
         </div>
       ) : (
         <div className="mt-10 grid grid-cols-2 gap-x-5 gap-y-10 md:grid-cols-3 lg:grid-cols-4">
-          {filtered.map((p) => <ProductCard key={p.id} product={p} />)}
+          {filtered.map((p) => (
+            <ProductCard key={p.id} product={p} />
+          ))}
         </div>
       )}
     </div>
@@ -120,3 +131,9 @@ function FilterPill({ label, active, to }: { label: string; active: boolean; to:
     </Link>
   );
 }
+
+
+
+
+
+
