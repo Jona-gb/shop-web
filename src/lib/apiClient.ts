@@ -1,18 +1,22 @@
 // Frontend API client that calls the backend
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || "";
+
+function buildUrl(endpoint) {
+  return API_URL ? `${API_URL}${endpoint}` : endpoint;
+}
 
 async function handleResponse(response) {
-  const contentType = response.headers.get('content-type');
+  const contentType = response.headers.get("content-type");
   if (!response.ok) {
     let error;
-    if (contentType?.includes('application/json')) {
+    if (contentType?.includes("application/json")) {
       error = await response.json();
     } else {
       error = { error: `HTTP ${response.status}` };
     }
     throw error;
   }
-  if (contentType?.includes('application/json')) {
+  if (contentType?.includes("application/json")) {
     return response.json();
   }
   return response;

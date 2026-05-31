@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { apiCall } from "@/lib/apiClient";
 
 export type Role = "customer" | "admin";
 export interface AuthUser {
@@ -35,35 +36,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const login: AuthCtx["login"] = async (email, password) => {
-    const response = await fetch("/api/auth/login", {
+    const user = await apiCall("/api/auth/login", {
       method: "POST",
-      headers: { "content-type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
 
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || "Could not sign in");
-    }
-
-    const user = await response.json();
     persist(user);
     return user;
   };
 
   const signup: AuthCtx["signup"] = async (name, email, password) => {
-    const response = await fetch("/api/auth/signup", {
+    const user = await apiCall("/api/auth/signup", {
       method: "POST",
-      headers: { "content-type": "application/json" },
       body: JSON.stringify({ email, name, password }),
     });
 
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || "Could not create account");
-    }
-
-    const user = await response.json();
     persist(user);
     return user;
   };
