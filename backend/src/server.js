@@ -161,6 +161,15 @@ app.all('/api/*', async (req, res) => {
     }
   } catch (error) {
     console.error('API error:', error);
+    if (
+      error instanceof Error &&
+      (error.message.includes('in stock') ||
+        error.message.includes('out of stock') ||
+        error.message.includes('positive integer'))
+    ) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
     res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });

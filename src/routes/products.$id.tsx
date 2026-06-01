@@ -47,6 +47,7 @@ function ProductPage() {
   const { add } = useCart();
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
+  const inStock = product.stock > 0;
 
   const related = relatedProducts;
 
@@ -68,18 +69,18 @@ function ProductPage() {
 
           <p className="mt-6 leading-relaxed text-muted-foreground">{product.description}</p>
           <p className="mt-4 text-sm font-medium text-foreground">
-            {product.stock > 0 ? `In stock: ${product.stock}` : "Out of stock"}
+            {inStock ? `In stock: ${product.stock}` : "Out of stock"}
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <div className="flex items-center rounded-full border border-border bg-card">
-              <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="px-3 py-2.5 text-foreground/70 hover:text-primary" aria-label="Decrease">
+              <button onClick={() => setQty((q) => Math.max(1, q - 1))} disabled={!inStock} className="px-3 py-2.5 text-foreground/70 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50" aria-label="Decrease">
                 <Minus className="h-4 w-4" />
               </button>
               <span className="w-10 text-center text-sm font-semibold">{qty}</span>
               <button
                 onClick={() => setQty((q) => Math.min(product.stock, q + 1))}
-                disabled={qty >= product.stock || product.stock <= 0}
+                disabled={qty >= product.stock || !inStock}
                 className="px-3 py-2.5 text-foreground/70 hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="Increase"
               >
@@ -87,11 +88,11 @@ function ProductPage() {
               </button>
             </div>
             <button
-              onClick={() => { add(product.id, qty); setAdded(true); setTimeout(() => setAdded(false), 1800); }}
-              disabled={product.stock <= 0}
+              onClick={() => { add(product.id, qty, product.stock); setAdded(true); setTimeout(() => setAdded(false), 1800); }}
+              disabled={!inStock}
               className="flex-1 rounded-full bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90 sm:flex-none disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {added ? "Added to cart ✓" : "Add to cart"}
+              {added ? "Added to cart" : inStock ? "Add to cart" : "Out of stock"}
             </button>
           </div>
 

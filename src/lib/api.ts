@@ -336,9 +336,18 @@ export async function handleApiRequest(request: Request): Promise<Response> {
     });
 
     const orderItems = await Promise.all(validatedItems.map(async (item) => {
+      if (!Number.isInteger(item.qty) || item.qty <= 0) {
+        throw new Error("Item quantity must be a positive integer.");
+      }
       const product = await getProductById(item.productId);
       if (!product) {
         throw new Error(`Product not found: ${item.productId}`);
+      }
+      if (product.stock <= 0) {
+        throw new Error(`${product.name} is out of stock.`);
+      }
+      if (item.qty > product.stock) {
+        throw new Error(`${product.name} has only ${product.stock} in stock.`);
       }
       return {
         productId: item.productId,
@@ -385,7 +394,10 @@ export async function handleApiRequest(request: Request): Promise<Response> {
         error.message.includes("Password") ||
         error.message.includes("already exists") ||
         error.message.includes("Invalid email or password") ||
-        error.message.includes("Image must")
+        error.message.includes("Image must") ||
+        error.message.includes("in stock") ||
+        error.message.includes("out of stock") ||
+        error.message.includes("positive integer")
       ) {
         return json({ error: error.message }, 400, { "cache-control": "no-store" });
       }

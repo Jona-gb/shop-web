@@ -619,33 +619,66 @@ export async function createOrder(order: {
 }) {
   await ensureInitialized();
   const pool = await poolPromise;
+  const connection = await pool.getConnection();
 
-  const [result] = await pool.query<import("mysql2").OkPacket>(
-    `INSERT INTO orders (orderNumber, name, phone, email, address, payment, subtotal, shipping, total, createdAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      order.orderNumber,
-      order.name,
-      order.phone,
-      order.email,
-      order.address,
-      order.payment,
-      order.subtotal,
-      order.shipping,
-      order.total,
-      new Date().toISOString().slice(0, 19).replace("T", " "),
-    ],
-  );
+  try {
+    await connection.beginTransaction();
 
-  const orderId = result.insertId;
-  const values = order.items.flatMap((item) => [orderId, item.productId, item.qty, item.lineTotal]);
-  await pool.query(
-    `INSERT INTO order_items (orderId, productId, qty, lineTotal)
-     VALUES ${order.items.map(() => "(?, ?, ?, ?)").join(", ")}`,
-    values,
-  );
+    for (const item of order.items) {
+      if (!Number.isInteger(item.qty) || item.qty <= 0) {
+        throw new Error("Item quantity must be a positive integer.");
+      }
 
-  return order.orderNumber;
+      const [stockResult] = await connection.query<import("mysql2").OkPacket>(
+        "UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?",
+        [item.qty, item.productId, item.qty],
+      );
+
+      if (stockResult.affectedRows === 0) {
+        const [rows] = await connection.query<RowDataPacket[]>(
+          "SELECT name, stock FROM products WHERE id = ?",
+          [item.productId],
+        );
+        const product = rows[0] as { name?: string; stock?: number } | undefined;
+        const name = product?.name ?? item.productId;
+        const available = product?.stock ?? 0;
+        throw new Error(`${name} has only ${available} in stock.`);
+      }
+    }
+
+    const [result] = await connection.query<import("mysql2").OkPacket>(
+      `INSERT INTO orders (orderNumber, name, phone, email, address, payment, subtotal, shipping, total, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        order.orderNumber,
+        order.name,
+        order.phone,
+        order.email,
+        order.address,
+        order.payment,
+        order.subtotal,
+        order.shipping,
+        order.total,
+        new Date().toISOString().slice(0, 19).replace("T", " "),
+      ],
+    );
+
+    const orderId = result.insertId;
+    const values = order.items.flatMap((item) => [orderId, item.productId, item.qty, item.lineTotal]);
+    await connection.query(
+      `INSERT INTO order_items (orderId, productId, qty, lineTotal)
+       VALUES ${order.items.map(() => "(?, ?, ?, ?)").join(", ")}`,
+      values,
+    );
+
+    await connection.commit();
+    return order.orderNumber;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 export async function getOrderByOrderNumber(orderNumber: string): Promise<OrderRecord | undefined> {

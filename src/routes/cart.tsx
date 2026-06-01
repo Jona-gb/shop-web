@@ -13,6 +13,7 @@ function CartPage() {
   const { detailed, subtotal, setQty, remove } = useCart();
   const shipping = getShippingCost(subtotal);
   const total = getOrderTotal(subtotal);
+  const hasUnavailableItems = detailed.some(({ product, qty }) => product.stock <= 0 || qty > product.stock);
 
   if (detailed.length === 0) {
     return (
@@ -50,7 +51,12 @@ function CartPage() {
                       {product.name}
                     </Link>
                     <p className="mt-0.5 text-xs text-muted-foreground">{categoryName(product.category)}</p>
-                    <p className="mt-2 text-xs text-foreground">{product.stock > 0 ? `Available: ${product.stock}` : "Out of stock"}</p>
+                    <p className={`mt-2 text-xs ${product.stock <= 0 || qty > product.stock ? "text-destructive" : "text-foreground"}`}>
+                      {product.stock > 0 ? `Available: ${product.stock}` : "Out of stock"}
+                    </p>
+                    {qty > product.stock && product.stock > 0 && (
+                      <p className="mt-1 text-xs text-destructive">Reduce quantity before checkout.</p>
+                    )}
                   </div>
                   <button onClick={() => remove(product.id)} className="text-muted-foreground hover:text-destructive" aria-label="Remove">
                     <X className="h-4 w-4" />
@@ -85,12 +91,22 @@ function CartPage() {
           </div>
           <div className="my-5 border-t border-border" />
           <Row label="Total" value={formatPrice(total)} emphasis />
-          <Link
-            to="/checkout"
-            className="mt-6 block w-full rounded-full bg-primary py-3 text-center text-sm font-semibold text-primary-foreground hover:opacity-90"
-          >
-            Proceed to checkout
-          </Link>
+          {hasUnavailableItems ? (
+            <button
+              type="button"
+              disabled
+              className="mt-6 block w-full rounded-full bg-primary py-3 text-center text-sm font-semibold text-primary-foreground opacity-50"
+            >
+              Update cart to checkout
+            </button>
+          ) : (
+            <Link
+              to="/checkout"
+              className="mt-6 block w-full rounded-full bg-primary py-3 text-center text-sm font-semibold text-primary-foreground hover:opacity-90"
+            >
+              Proceed to checkout
+            </Link>
+          )}
           <Link to="/products" className="mt-3 block text-center text-sm font-medium text-muted-foreground hover:text-primary">
             Continue shopping →
           </Link>

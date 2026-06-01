@@ -371,6 +371,15 @@ export async function handleApiRequest(request) {
       if (!product) {
         throw new Error(`Product not found: ${item.productId}`);
       }
+      if (!Number.isInteger(item.qty) || item.qty <= 0) {
+        throw new Error('Item quantity must be a positive integer.');
+      }
+      if (product.stock <= 0) {
+        throw new Error(`${product.name} is out of stock.`);
+      }
+      if (item.qty > product.stock) {
+        throw new Error(`${product.name} has only ${product.stock} in stock.`);
+      }
       return {
         productId: item.productId,
         qty: item.qty,

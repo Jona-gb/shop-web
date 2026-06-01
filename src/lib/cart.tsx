@@ -11,7 +11,7 @@ import {
 
 type CartCtx = {
   items: CartItem[];
-  add: (productId: string, qty?: number) => void;
+  add: (productId: string, qty?: number, maxQty?: number) => void;
   remove: (productId: string) => void;
   setQty: (productId: string, qty: number) => void;
   clear: () => void;
@@ -77,26 +77,37 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<CartCtx>(() => {
     const detailed = buildDetailedCart(items, products);
+    const stockByProductId = new Map(products.map((product) => [product.id, product.stock]));
+    const clampQty = (productId: string, qty: number, maxQty?: number) => {
+      const stock = maxQty ?? stockByProductId.get(productId);
+      if (stock !== undefined) return Math.max(0, Math.min(stock, qty));
+      return Math.max(0, qty);
+    };
 
     return {
       items,
-      add: (productId, qty = 1) =>
+      add: (productId, qty = 1, maxQty) =>
         setItems((prev) => {
+          const nextQty = clampQty(productId, qty, maxQty);
+          if (nextQty <= 0) return prev;
           const idx = prev.findIndex((i) => i.productId === productId);
           if (idx >= 0) {
             const next = [...prev];
-            next[idx] = { ...next[idx], qty: next[idx].qty + qty };
+            const currentQty = next[idx].qty;
+            const cappedQty = clampQty(productId, currentQty + qty, maxQty);
+            next[idx] = { ...next[idx], qty: cappedQty };
             return next;
           }
-          return [...prev, { productId, qty }];
+          return [...prev, { productId, qty: nextQty }];
         }),
       remove: (productId) => setItems((prev) => prev.filter((i) => i.productId !== productId)),
       setQty: (productId, qty) =>
-        setItems((prev) =>
-          qty <= 0
+        setItems((prev) => {
+          const nextQty = clampQty(productId, qty);
+          return nextQty <= 0
             ? prev.filter((i) => i.productId !== productId)
-            : prev.map((i) => (i.productId === productId ? { ...i, qty } : i)),
-        ),
+            : prev.map((i) => (i.productId === productId ? { ...i, qty: nextQty } : i));
+        }),
       clear: () => setItems([]),
       count: calculateCartCount(items),
       subtotal: calculateCartSubtotal(detailed),

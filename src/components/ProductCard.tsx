@@ -7,6 +7,7 @@ import { ProductQuickView } from "./ProductQuickView";
 
 export function ProductCard({ product }: { product: Product }) {
   const [quickOpen, setQuickOpen] = useState(false);
+  const inStock = product.stock > 0;
 
   return (
     <>
@@ -23,6 +24,11 @@ export function ProductCard({ product }: { product: Product }) {
           {product.isNew && (
             <span className="absolute left-4 top-4 rounded-full bg-accent px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-accent-foreground">
               New
+            </span>
+          )}
+          {!inStock && (
+            <span className="absolute right-4 top-4 rounded-full bg-destructive px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-destructive-foreground">
+              Out of stock
             </span>
           )}
           <div className="absolute inset-0 flex items-end justify-center bg-black/0 p-4 transition-all duration-300 group-hover:bg-black/20">
@@ -46,6 +52,9 @@ export function ProductCard({ product }: { product: Product }) {
               {categoryName(product.category)}
             </p>
             <h3 className="mt-1 truncate text-sm font-semibold text-foreground group-hover:text-primary">{product.name}</h3>
+            <p className={`mt-1 text-xs ${inStock ? "text-muted-foreground" : "text-destructive"}`}>
+              {inStock ? `${product.stock} in stock` : "Out of stock"}
+            </p>
           </div>
           <p className="shrink-0 text-sm font-semibold text-foreground">{formatPrice(product.price)}</p>
         </Link>

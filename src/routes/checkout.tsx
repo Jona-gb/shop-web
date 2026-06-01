@@ -19,6 +19,7 @@ function CheckoutPage() {
   const navigate = useNavigate();
   const shipping = getShippingCost(subtotal);
   const total = getOrderTotal(subtotal);
+  const hasUnavailableItems = detailed.some(({ product, qty }) => product.stock <= 0 || qty > product.stock);
 
   const [form, setForm] = useState({ name: "", phone: "", email: "", address: "", payment: "cod" as "cod" | "mobile" });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -38,6 +39,10 @@ function CheckoutPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (hasUnavailableItems) {
+      setErrors({ form: "One or more cart items are out of stock. Update your cart before placing the order." });
+      return;
+    }
     const parsed = checkoutSchema.safeParse(form);
     if (!parsed.success) {
       setErrors(parseCheckoutErrors(parsed));
@@ -65,7 +70,7 @@ function CheckoutPage() {
         setErrors(data.errors);
         return;
       }
-      setErrors({ form: "Could not complete order. Try again." });
+      setErrors({ form: data?.error ?? "Could not complete order. Try again." });
       return;
     }
 
@@ -127,13 +132,19 @@ function CheckoutPage() {
           <ul className="mt-4 space-y-2 text-sm">
             {detailed.map(({ product, qty, lineTotal }) => (
               <li key={product.id} className="flex justify-between gap-4">
-                <span className="text-muted-foreground">
+                <span className={product.stock <= 0 || qty > product.stock ? "text-destructive" : "text-muted-foreground"}>
                   {product.name} <span className="text-foreground/80">× {qty}</span>
+                  {(product.stock <= 0 || qty > product.stock) && (
+                    <span className="mt-1 block text-xs text-destructive">
+                      {product.stock <= 0 ? "Out of stock" : `Only ${product.stock} available`}
+                    </span>
+                  )}
                 </span>
                 <span className="font-medium">{formatPrice(lineTotal)}</span>
               </li>
             ))}
           </ul>
+          {errors.form && <p className="mt-4 text-sm text-destructive">{errors.form}</p>}
           <div className="my-4 border-t border-border" />
           <div className="space-y-1.5 text-sm">
             <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{formatPrice(subtotal)}</span></div>
@@ -144,10 +155,10 @@ function CheckoutPage() {
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || hasUnavailableItems}
             className="mt-6 w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
           >
-            {submitting ? "Placing order…" : "Place order"}
+            {submitting ? "Placing order..." : hasUnavailableItems ? "Update cart to place order" : "Place order"}
           </button>
           <p className="mt-3 text-center text-xs text-muted-foreground">
             Secure manual payment · No card required
