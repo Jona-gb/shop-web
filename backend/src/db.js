@@ -1,5 +1,6 @@
 import { createPool } from 'mysql2/promise';
 import bcrypt from 'bcrypt';
+import { createHash } from 'crypto';
 
 const CACHE_TTL = 60_000;
 const cache = new Map();
@@ -265,6 +266,8 @@ async function initSchema(pool) {
       createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`);
 
+  await ensureUsersSchemaCompatibility(pool);
+
   const [categoryRows] = await pool.query('SELECT COUNT(*) AS count FROM categories');
   const categoryCount = Number(categoryRows[0]?.count ?? 0);
   if (categoryCount === 0) {
@@ -300,12 +303,35 @@ async function initSchema(pool) {
   if (userCount === 0) {
     const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
     const hash = await bcrypt.hash(adminPassword, 10);
-    await pool.query('INSERT INTO users (email, name, passwordHash, role) VALUES (?, ?, ?, ?)', [
+    const legacyPassword = createHash('sha256').update(adminPassword).digest('hex');
+    await pool.query('INSERT INTO users (email, name, passwordHash, password, role) VALUES (?, ?, ?, ?, ?)', [
       'admin@shopease.com',
       'Store Admin',
       hash,
+      legacyPassword,
       'admin',
     ]);
+  }
+}
+
+async function ensureUsersSchemaCompatibility(pool) {
+  const [columns] = await pool.query('SHOW COLUMNS FROM users');
+  const columnNames = new Set(columns.map((column) => column.Field));
+
+  if (!columnNames.has('passwordHash')) {
+    await pool.query('ALTER TABLE users ADD COLUMN passwordHash TEXT NULL');
+  }
+
+  if (!columnNames.has('password')) {
+    await pool.query('ALTER TABLE users ADD COLUMN password VARCHAR(191) NULL');
+  } else {
+    await pool.query('ALTER TABLE users MODIFY password VARCHAR(191) NULL');
+  }
+
+  if (!columnNames.has('createdAt')) {
+    await pool.query('ALTER TABLE users ADD COLUMN createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
+  } else {
+    await pool.query('ALTER TABLE users MODIFY createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
   }
 }
 
@@ -395,10 +421,12 @@ export async function createUser(email, name, password, role = 'customer') {
   const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [trimmedEmail]);
   if (existing.length > 0) throw new Error('An account with this email already exists');
   const passwordHash = await bcrypt.hash(password, 10);
-  const [result] = await pool.query('INSERT INTO users (email, name, passwordHash, role) VALUES (?, ?, ?, ?)', [
+  const legacyPassword = createHash('sha256').update(password).digest('hex');
+  const [result] = await pool.query('INSERT INTO users (email, name, passwordHash, password, role) VALUES (?, ?, ?, ?, ?)', [
     trimmedEmail,
     trimmedName,
     passwordHash,
+    legacyPassword,
     role,
   ]);
   return { id: String(result.insertId), email: trimmedEmail, name: trimmedName, role };
@@ -409,10 +437,21 @@ export async function authenticateUser(email, password) {
   if (!trimmedEmail || !password) throw new Error('Email and password are required.');
   await ensureInitialized();
   const pool = await poolPromise;
-  const [rows] = await pool.query('SELECT id, email, name, passwordHash, role FROM users WHERE email = ?', [trimmedEmail]);
+  const [rows] = await pool.query('SELECT id, email, name, passwordHash, password, role FROM users WHERE email = ?', [trimmedEmail]);
   if (rows.length === 0) throw new Error('Invalid email or password');
   const user = rows[0];
-  const ok = await bcrypt.compare(password, user.passwordHash);
+  let ok = false;
+  if (user.passwordHash) {
+    ok = await bcrypt.compare(password, user.passwordHash);
+  }
+
+  if (!ok && user.password) {
+    ok = createHash('sha256').update(password).digest('hex') === user.password;
+    if (ok) {
+      const passwordHash = await bcrypt.hash(password, 10);
+      await pool.query('UPDATE users SET passwordHash = ? WHERE email = ?', [passwordHash, trimmedEmail]);
+    }
+  }
   if (!ok) throw new Error('Invalid email or password');
   return { id: String(user.id), email: user.email, name: user.name, role: user.role };
 }

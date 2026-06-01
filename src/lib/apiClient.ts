@@ -14,7 +14,14 @@ async function handleResponse(response) {
     } else {
       error = { error: `HTTP ${response.status}` };
     }
-    throw error;
+    const message =
+      error?.error ??
+      error?.message ??
+      (error?.errors && typeof error.errors === "object"
+        ? Object.values(error.errors).flat().join(" ")
+        : null) ??
+      `HTTP ${response.status}`;
+    throw new Error(message);
   }
   if (contentType?.includes("application/json")) {
     return response.json();

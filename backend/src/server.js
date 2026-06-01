@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { mkdir, writeFile } from 'fs/promises';
+import { randomUUID } from 'crypto';
 import { handleApiRequest } from './api.js';
 import { createUser, authenticateUser } from './db.js';
 
@@ -12,15 +14,60 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-const allowedOrigins = [process.env.FRONTEND_URL || 'http://localhost:5173', 'http://localhost:8080'];
+const allowedOrigins = new Set([
+  process.env.FRONTEND_URL || 'http://localhost:5173',
+  'http://localhost:8080',
+  'http://127.0.0.1:8080',
+]);
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (allowedOrigins.has(origin)) return true;
+
+  try {
+    const url = new URL(origin);
+    return (url.hostname === 'localhost' || url.hostname === '127.0.0.1') && /^\d+$/.test(url.port);
+  } catch {
+    return false;
+  }
+}
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin(origin, callback) {
+    callback(null, isAllowedOrigin(origin));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json());
+
+const productImageTypes = new Map([
+  ['image/jpeg', '.jpg'],
+  ['image/png', '.png'],
+  ['image/webp', '.webp'],
+  ['image/gif', '.gif'],
+]);
+const maxProductImageBytes = 5 * 1024 * 1024;
+const uploadDir = join(__dirname, '..', '..', 'public', 'uploads', 'products');
+
+function readRequestBuffer(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > maxProductImageBytes + 1024 * 1024) {
+        reject(new Error('Image must be 5 MB or smaller.'));
+        req.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
 
 // Health check
 app.get('/health', (req, res) => {
@@ -49,6 +96,36 @@ app.post('/api/auth/login', async (req, res) => {
     return res.json(user);
   } catch (err) {
     return res.status(400).json({ error: err instanceof Error ? err.message : 'Could not sign in' });
+  }
+});
+
+app.post('/api/admin/product-images', async (req, res) => {
+  try {
+    const body = await readRequestBuffer(req);
+    const formRequest = new Request(`http://localhost:${PORT}${req.originalUrl}`, {
+      method: 'POST',
+      headers: new Headers(req.headers || {}),
+      body,
+    });
+    const form = await formRequest.formData();
+    const image = form.get('image');
+
+    if (!(image instanceof File)) {
+      return res.status(400).json({ error: 'Image file is required.' });
+    }
+    if (!productImageTypes.has(image.type)) {
+      return res.status(400).json({ error: 'Image must be a JPG, PNG, WebP, or GIF file.' });
+    }
+    if (image.size > maxProductImageBytes) {
+      return res.status(400).json({ error: 'Image must be 5 MB or smaller.' });
+    }
+
+    await mkdir(uploadDir, { recursive: true });
+    const filename = `${randomUUID()}${productImageTypes.get(image.type)}`;
+    await writeFile(join(uploadDir, filename), Buffer.from(await image.arrayBuffer()));
+    return res.status(201).json({ url: `/uploads/products/${filename}` });
+  } catch (err) {
+    return res.status(400).json({ error: err instanceof Error ? err.message : 'Could not upload image' });
   }
 });
 

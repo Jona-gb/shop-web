@@ -16,7 +16,13 @@ import {
   getCartItems,
   setCartItems,
   clearCartItems,
+  getRelatedProducts,
+  createUser,
+  getUserByEmail,
+  hashPassword,
 } from "@/lib/db";
+import { mkdir, writeFile } from "node:fs/promises";
+import { extname, join } from "node:path";
 import {
   checkoutSchema,
   createOrderNumber,
@@ -38,6 +44,37 @@ function json(data: unknown, status = 200, headers: Record<string, string> = {})
 
 function badRequest(payload: unknown, headers?: Record<string, string>) {
   return json(payload, 400, headers);
+}
+
+const maxProductImageBytes = 5 * 1024 * 1024;
+const productImageTypes = new Map([
+  ["image/jpeg", ".jpg"],
+  ["image/png", ".png"],
+  ["image/webp", ".webp"],
+  ["image/gif", ".gif"],
+]);
+
+function sanitizeImageExt(name: string, type: string) {
+  const mapped = productImageTypes.get(type);
+  if (mapped) return mapped;
+  const ext = extname(name).toLowerCase();
+  return [".jpg", ".jpeg", ".png", ".webp", ".gif"].includes(ext) ? ext : "";
+}
+
+async function saveProductImage(file: File) {
+  if (!productImageTypes.has(file.type)) {
+    throw new Error("Image must be a JPG, PNG, WebP, or GIF file.");
+  }
+  if (file.size > maxProductImageBytes) {
+    throw new Error("Image must be 5 MB or smaller.");
+  }
+
+  const ext = sanitizeImageExt(file.name, file.type);
+  const filename = `${crypto.randomUUID()}${ext}`;
+  const uploadDir = join(process.cwd(), "public", "uploads", "products");
+  await mkdir(uploadDir, { recursive: true });
+  await writeFile(join(uploadDir, filename), Buffer.from(await file.arrayBuffer()));
+  return `/uploads/products/${filename}`;
 }
 
 function parseCookies(cookieHeader: string | null) {
@@ -87,6 +124,41 @@ export async function handleApiRequest(request: Request): Promise<Response> {
   const startTime = performance.now();
 
   try {
+    if (path === "/api/admin/product-images" && request.method === "POST") {
+      const form = await request.formData();
+      const image = form.get("image");
+      if (!(image instanceof File)) {
+        return badRequest({ error: "Image file is required." }, { "cache-control": "no-store" });
+      }
+
+      const url = await saveProductImage(image);
+      return json({ url }, 201, { "cache-control": "no-store" });
+    }
+
+    if (path === "/api/auth/signup" && request.method === "POST") {
+      const body = await parseRequestBody(request);
+      if (!body || typeof body.email !== "string" || typeof body.name !== "string" || typeof body.password !== "string") {
+        return badRequest({ error: "Email, name, and password are required." }, { "cache-control": "no-store" });
+      }
+
+      const user = await createUser(body.name.trim(), body.email.trim(), body.password);
+      return json(user, 201, { "cache-control": "no-store" });
+    }
+
+    if (path === "/api/auth/login" && request.method === "POST") {
+      const body = await parseRequestBody(request);
+      if (!body || typeof body.email !== "string" || typeof body.password !== "string") {
+        return badRequest({ error: "Email and password are required." }, { "cache-control": "no-store" });
+      }
+
+      const user = await getUserByEmail(body.email);
+      if (!user || user.password !== hashPassword(body.password)) {
+        return badRequest({ error: "Invalid email or password" }, { "cache-control": "no-store" });
+      }
+
+      return json({ email: user.email, name: user.name, role: user.role }, 200, { "cache-control": "no-store" });
+    }
+
     if (path === "/api/categories" && request.method === "GET") {
       return json(await getCategories());
     }
@@ -306,6 +378,16 @@ export async function handleApiRequest(request: Request): Promise<Response> {
     if (error instanceof Error) {
       if (error.message.includes("still in use")) {
         return json({ error: error.message }, 400);
+      }
+      if (
+        error.message.includes("required") ||
+        error.message.includes("Valid email") ||
+        error.message.includes("Password") ||
+        error.message.includes("already exists") ||
+        error.message.includes("Invalid email or password") ||
+        error.message.includes("Image must")
+      ) {
+        return json({ error: error.message }, 400, { "cache-control": "no-store" });
       }
       if (error.message.includes("not found")) {
         return json({ error: error.message }, 404);

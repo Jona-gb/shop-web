@@ -216,6 +216,15 @@ export function fetchCreateProduct(product: Product): Promise<Product> {
   });
 }
 
+export function fetchUploadProductImage(file: File): Promise<{ url: string }> {
+  const body = new FormData();
+  body.append("image", file);
+  return apiRequest<{ url: string }>("/api/admin/product-images", {
+    method: "POST",
+    body,
+  });
+}
+
 export async function fetchRelatedProducts(category: string, excludeId: string, limit = 4): Promise<Product[]> {
   if (import.meta.env.SSR) {
     const { getRelatedProducts } = await import("@/lib/db");

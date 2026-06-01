@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Activity, Plus, Pencil, Trash2, X, Tag, Package, List, Save, Lock, LayoutDashboard, Search, Bell, MessageSquare, Settings, LogOut, ChevronRight, Users, BarChart, FileText, MoreVertical, CalendarDays, Globe2, ShoppingBag, ShoppingCart, ReceiptText, PackageSearch } from "lucide-react";
+import { Activity, Plus, Pencil, Trash2, X, Tag, Package, List, Save, Lock, LayoutDashboard, Search, Bell, MessageSquare, Settings, LogOut, ChevronRight, Users, BarChart, FileText, MoreVertical, CalendarDays, Globe2, ShoppingBag, ShoppingCart, ReceiptText, PackageSearch, ImagePlus } from "lucide-react";
 import {
   fetchCreateCategory,
   fetchUpdateCategory,
@@ -9,6 +9,7 @@ import {
   fetchCreateProduct,
   fetchUpdateProduct,
   fetchDeleteProduct,
+  fetchUploadProductImage,
   fetchResetStore,
   newId,
   slugify,
@@ -1313,9 +1314,30 @@ function ProductForm({
 }) {
   const [p, setP] = useState<Product>(initial);
   const [err, setErr] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   function update<K extends keyof Product>(k: K, v: Product[K]) {
     setP((prev) => ({ ...prev, [k]: v }));
+    setErr(null);
+  }
+
+  async function uploadImage(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setErr("Choose an image file.");
+      return;
+    }
+
+    setUploading(true);
+    setErr(null);
+    try {
+      const { url } = await fetchUploadProductImage(file);
+      update("image", url);
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : String(error));
+    } finally {
+      setUploading(false);
+    }
   }
 
   function submit(e: React.FormEvent) {
@@ -1352,8 +1374,24 @@ function ProductForm({
           <input type="number" min={0} step={1} value={p.stock} onChange={(e) => update("stock", Number(e.target.value))} className={inputCls} />
         </FieldRow>
 
-        <FieldRow label="Image URL">
-          <input value={p.image} onChange={(e) => update("image", e.target.value)} className={inputCls} placeholder="https://..." />
+        <FieldRow label="Image">
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+            <input value={p.image} onChange={(e) => update("image", e.target.value)} className={inputCls} placeholder="https://... or /uploads/products/image.jpg" />
+            <label className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-white px-4 text-sm font-semibold text-foreground transition hover:border-primary hover:text-primary">
+              <ImagePlus className="h-4 w-4" />
+              {uploading ? "Uploading" : "Upload"}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="sr-only"
+                disabled={uploading}
+                onChange={(e) => {
+                  void uploadImage(e.target.files?.[0]);
+                  e.currentTarget.value = "";
+                }}
+              />
+            </label>
+          </div>
         </FieldRow>
 
         <FieldRow label="Description">
@@ -1374,7 +1412,7 @@ function ProductForm({
         {err && <p className="text-sm text-destructive">{err}</p>}
 
         <div className="flex gap-3 pt-2">
-          <button type="submit" className="rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90">
+          <button type="submit" disabled={uploading} className="rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50">
             Save product
           </button>
           <button type="button" onClick={onCancel} className="rounded-full border border-border bg-card px-6 py-2.5 text-sm font-semibold hover:border-foreground/30">

@@ -3,7 +3,7 @@ import { apiCall } from "@/lib/apiClient";
 
 export type Role = "customer" | "admin";
 export interface AuthUser {
-  id: number;
+  id?: string | number;
   email: string;
   name: string;
   role: Role;
