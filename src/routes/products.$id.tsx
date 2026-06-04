@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Minus, Plus, ArrowLeft, Truck, RotateCcw, ShieldCheck } from "lucide-react";
-import { useApiProducts, useApiRelatedProducts, categoryName, type Product } from "@/lib/products";
+import { useApiProduct, useApiRelatedProducts, categoryName, type Product } from "@/lib/products";
 import { formatPrice, useCart } from "@/lib/cart";
 import { ProductCard } from "@/components/ProductCard";
 
@@ -42,7 +42,9 @@ export const Route = createFileRoute("/products/$id")({
 });
 
 function ProductPage() {
-  const product = Route.useLoaderData() as Product;
+  const loaderProduct = Route.useLoaderData() as Product;
+  const { data: queriedProduct } = useApiProduct(loaderProduct.id, loaderProduct);
+  const product = queriedProduct ?? loaderProduct;
   const { data: relatedProducts = [] } = useApiRelatedProducts(product.category, product.id, 4);
   const { add } = useCart();
   const [qty, setQty] = useState(1);
@@ -50,6 +52,10 @@ function ProductPage() {
   const inStock = product.stock > 0;
 
   const related = relatedProducts;
+
+  useEffect(() => {
+    setQty((current) => Math.max(1, Math.min(product.stock || 1, current)));
+  }, [product.stock]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">

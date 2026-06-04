@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { Activity, Plus, Pencil, Trash2, X, Tag, Package, List, Save, Lock, LayoutDashboard, Search, Bell, MessageSquare, Settings, LogOut, ChevronRight, Users, BarChart, FileText, MoreVertical, CalendarDays, Globe2, ShoppingBag, ShoppingCart, ReceiptText, PackageSearch, ImagePlus } from "lucide-react";
 import {
   fetchCreateCategory,
@@ -17,6 +17,8 @@ import {
   type Category,
   type Product,
   type OrderRecord,
+  type AdminDashboardData,
+  type HomePageData,
   useApiAdminDashboard,
   fetchAdminDashboard,
 } from "@/lib/products";
@@ -79,6 +81,59 @@ function AdminGate() {
 }
 
 type Tab = "overview" | "products" | "categories" | "orders" | "users" | "analytics";
+
+function updateProductListCache(old: Product[] | undefined, product?: Product, deletedId?: string) {
+  if (!old) return old;
+  if (deletedId) return old.filter((item) => item.id !== deletedId);
+  if (!product) return old;
+
+  let replaced = false;
+  const next = old.map((item) => {
+    if (item.id !== product.id) return item;
+    replaced = true;
+    return product;
+  });
+  return replaced ? next : old;
+}
+
+async function refreshProductQueries(queryClient: QueryClient, product?: Product, deletedId?: string) {
+  if (product) {
+    queryClient.setQueryData(["product", product.id], product);
+  }
+
+  queryClient.setQueriesData<Product[]>({ queryKey: ["products"] }, (old) => updateProductListCache(old, product, deletedId));
+  queryClient.setQueriesData<Product[]>({ queryKey: ["products-by-ids"] }, (old) => updateProductListCache(old, product, deletedId));
+  queryClient.setQueriesData<Product[]>({ queryKey: ["related-products"] }, (old) => updateProductListCache(old, product, deletedId));
+  queryClient.setQueryData<AdminDashboardData>(["admin-dashboard"], (old) => {
+    if (!old) return old;
+    const products = deletedId
+      ? old.products.filter((item) => item.id !== deletedId)
+      : product
+      ? old.products.some((item) => item.id === product.id)
+        ? old.products.map((item) => (item.id === product.id ? product : item))
+        : [...old.products, product]
+      : old.products;
+    return { ...old, products };
+  });
+  queryClient.setQueryData<HomePageData>(["home-page-data"], (old) => {
+    if (!old) return old;
+    return {
+      ...old,
+      featured: updateProductListCache(old.featured, product, deletedId) ?? old.featured,
+      newArrivals: updateProductListCache(old.newArrivals, product, deletedId) ?? old.newArrivals,
+    };
+  });
+
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }),
+    queryClient.invalidateQueries({ queryKey: ["products"] }),
+    queryClient.invalidateQueries({ queryKey: ["product"] }),
+    queryClient.invalidateQueries({ queryKey: ["products-by-ids"] }),
+    queryClient.invalidateQueries({ queryKey: ["home-page-data"] }),
+    queryClient.invalidateQueries({ queryKey: ["related-products"] }),
+    queryClient.invalidateQueries({ queryKey: ["categories"] }),
+  ]);
+}
 
 export function AdminPage() {
   const { user, logout } = useAuth();
@@ -645,8 +700,7 @@ function ProductsTab({ products, categories, loading, hasError }: { products: Pr
         <button
           type="button"
           onClick={() => {
-            queryClient.invalidateQueries({ queryKey: ["products"] });
-            queryClient.invalidateQueries({ queryKey: ["categories"] });
+            void refreshProductQueries(queryClient);
           }}
           className="mt-5 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-blue-600"
         >
@@ -660,8 +714,7 @@ function ProductsTab({ products, categories, loading, hasError }: { products: Pr
     if (!confirm("Delete this product?")) return;
     try {
       await fetchDeleteProduct(id);
-      queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      await refreshProductQueries(queryClient, undefined, id);
     } catch (error) {
       alert(error instanceof Error ? error.message : String(error));
     }
@@ -670,13 +723,13 @@ function ProductsTab({ products, categories, loading, hasError }: { products: Pr
   async function upsert(p: Product) {
     try {
       const exists = products.some((x) => x.id === p.id);
+      let saved: Product;
       if (exists) {
-        await fetchUpdateProduct(p);
+        saved = await fetchUpdateProduct(p);
       } else {
-        await fetchCreateProduct(p);
+        saved = await fetchCreateProduct(p);
       }
-      queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      await refreshProductQueries(queryClient, saved);
       setEditing(null);
       setCreating(false);
     } catch (error) {

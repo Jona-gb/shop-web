@@ -337,11 +337,13 @@ export function useApiRelatedProducts(category: string, excludeId: string, limit
   });
 }
 
-export function useApiProduct(id: string) {
+export function useApiProduct(id: string, initialProduct?: Product) {
   return useQuery({
     queryKey: ["product", id],
     queryFn: () => fetchProduct(id),
+    initialData: initialProduct,
     staleTime: 1000 * 60 * 2,
+    refetchInterval: 1000 * 15,
     enabled: Boolean(id),
   });
 }
