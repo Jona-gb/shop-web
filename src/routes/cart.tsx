@@ -3,6 +3,7 @@ import { Minus, Plus, X, ShoppingBag } from "lucide-react";
 import { formatPrice, useCart } from "@/lib/cart";
 import { categoryName } from "@/lib/products";
 import { getShippingCost, getOrderTotal } from "@/lib/controllers/checkoutController";
+import { getInventoryLabel, getInventoryStatus, getInventoryTextClass } from "@/lib/inventory";
 
 export const Route = createFileRoute("/cart")({
   head: () => ({ meta: [{ title: "Cart — ShopEase" }] }),
@@ -39,7 +40,9 @@ function CartPage() {
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_360px]">
         <ul className="space-y-4">
-          {detailed.map(({ product, qty, lineTotal }) => (
+          {detailed.map(({ product, qty, lineTotal }) => {
+            const inventoryStatus = getInventoryStatus(product.stock);
+            return (
             <li key={product.id} className="flex gap-4 rounded-2xl border border-border bg-card p-4">
               <Link to="/products/$id" params={{ id: product.id }} className="block w-24 shrink-0 overflow-hidden rounded-lg bg-muted sm:w-28">
                 <img src={product.image} alt={product.name} className="aspect-square h-full w-full object-cover" />
@@ -51,8 +54,8 @@ function CartPage() {
                       {product.name}
                     </Link>
                     <p className="mt-0.5 text-xs text-muted-foreground">{categoryName(product.category)}</p>
-                    <p className={`mt-2 text-xs ${product.stock <= 0 || qty > product.stock ? "text-destructive" : "text-foreground"}`}>
-                      {product.stock > 0 ? `Available: ${product.stock}` : "Out of stock"}
+                    <p className={`mt-2 text-xs ${qty > product.stock ? "text-destructive" : getInventoryTextClass(inventoryStatus)}`}>
+                      {getInventoryLabel(product.stock, true)}
                     </p>
                     {qty > product.stock && product.stock > 0 && (
                       <p className="mt-1 text-xs text-destructive">Reduce quantity before checkout.</p>
@@ -80,7 +83,8 @@ function CartPage() {
                 </div>
               </div>
             </li>
-          ))}
+          );
+          })}
         </ul>
 
         <aside className="h-fit rounded-2xl border border-border bg-card p-6">

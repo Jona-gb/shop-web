@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { type Product, categoryName } from "@/lib/products";
 import { formatPrice, useCart } from "@/lib/cart";
+import { getInventoryLabel, getInventoryStatus, getInventoryTextClass } from "@/lib/inventory";
 
 export function ProductQuickView({
   product,
@@ -23,6 +24,7 @@ export function ProductQuickView({
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const inStock = product.stock > 0;
+  const inventoryStatus = getInventoryStatus(product.stock);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -62,8 +64,8 @@ export function ProductQuickView({
               <p className="mt-4 leading-relaxed text-muted-foreground">
                 {product.description}
               </p>
-              <p className="mt-4 text-sm font-medium text-foreground">
-                {inStock ? `In stock: ${product.stock}` : "Out of stock"}
+              <p className={`mt-4 text-sm font-medium ${getInventoryTextClass(inventoryStatus)}`}>
+                {getInventoryLabel(product.stock, true)}
               </p>
 
               <div className="mt-6 space-y-3 border-t border-border pt-6 text-sm text-muted-foreground">

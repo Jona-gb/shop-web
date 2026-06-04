@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { Activity, Plus, Pencil, Trash2, X, Tag, Package, List, Save, Lock, LayoutDashboard, Search, Bell, MessageSquare, Settings, LogOut, ChevronRight, Users, BarChart, FileText, MoreVertical, CalendarDays, Globe2, ShoppingBag, ShoppingCart, ReceiptText, PackageSearch, ImagePlus } from "lucide-react";
+import { Activity, Plus, Minus, Pencil, Trash2, X, Tag, Package, List, Save, Lock, LayoutDashboard, Search, Bell, MessageSquare, Settings, LogOut, ChevronRight, Users, BarChart, FileText, MoreVertical, CalendarDays, Globe2, ShoppingBag, ShoppingCart, ReceiptText, PackageSearch, ImagePlus } from "lucide-react";
 import {
   fetchCreateCategory,
   fetchUpdateCategory,
@@ -39,6 +39,7 @@ import {
 } from "recharts";
 import { formatPrice } from "@/lib/cart";
 import { useAuth } from "@/lib/auth";
+import { calculateInventoryValue, getInventoryLabel, getInventoryStatus, getInventoryStatusClass, type InventoryStatus } from "@/lib/inventory";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin â€” ShopEase" }] }),
@@ -80,7 +81,7 @@ function AdminGate() {
   return <AdminPage />;
 }
 
-type Tab = "overview" | "products" | "categories" | "orders" | "users" | "analytics";
+type Tab = "overview" | "products" | "inventory" | "categories" | "orders" | "users" | "analytics";
 
 function updateProductListCache(old: Product[] | undefined, product?: Product, deletedId?: string) {
   if (!old) return old;
@@ -162,7 +163,7 @@ export function AdminPage() {
   const revenueStat = totalRevenue;
   const customerCount = totalUsers;
   const orderCount = totalOrders;
-  const inventoryValue = displayProducts.reduce((sum, product) => sum + (product.price || 0), 0);
+  const inventoryValue = calculateInventoryValue(displayProducts);
   const chartSource = buildRevenueSeries(orders, "month", 6);
   const orderChartSource = buildOrderSeries(orders, "month", 6);
   const orderScale = totalOrders > 0 && totalRevenue > 0 ? Math.max(totalRevenue / totalOrders, 1) : 1;
@@ -193,6 +194,7 @@ export function AdminPage() {
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: "overview", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> },
     { id: "products", label: "Products", icon: <Package className="h-4 w-4" /> },
+    { id: "inventory", label: "Inventory", icon: <PackageSearch className="h-4 w-4" /> },
     { id: "categories", label: "Categories", icon: <Tag className="h-4 w-4" /> },
     { id: "orders", label: "Orders", icon: <List className="h-4 w-4" /> },
     { id: "users", label: "Customers", icon: <Users className="h-4 w-4" /> },
@@ -351,6 +353,8 @@ export function AdminPage() {
               </div>
             ) : tab === "products" ? (
               <ProductsTab products={products} categories={categories} loading={productsLoading} hasError={productsError} />
+            ) : tab === "inventory" ? (
+              <InventoryTab products={products} loading={productsLoading} hasError={productsError} />
             ) : tab === "categories" ? (
               <CategoriesTab categories={categories} products={products} loading={categoriesLoading} />
             ) : tab === "orders" ? (
@@ -933,6 +937,188 @@ function UsersTab({ loading }: { loading: boolean }) {
             </table>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+type InventoryFilter = "all" | InventoryStatus;
+
+function InventoryTab({ products, loading, hasError }: { products: Product[]; loading: boolean; hasError: boolean }) {
+  const queryClient = useQueryClient();
+  const [filter, setFilter] = useState<InventoryFilter>("all");
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const inventoryValue = calculateInventoryValue(products);
+  const lowStockCount = products.filter((product) => getInventoryStatus(product.stock) === "low-stock").length;
+  const outOfStockCount = products.filter((product) => getInventoryStatus(product.stock) === "out-of-stock").length;
+  const totalUnits = products.reduce((sum, product) => sum + Math.max(0, product.stock), 0);
+  const filteredProducts = products
+    .filter((product) => filter === "all" || getInventoryStatus(product.stock) === filter)
+    .sort((a, b) => a.stock - b.stock || a.name.localeCompare(b.name));
+
+  async function saveStock(product: Product, stock: number) {
+    const nextStock = Math.max(0, Math.floor(Number.isFinite(stock) ? stock : product.stock));
+    if (nextStock === product.stock) return;
+    const updated = { ...product, stock: nextStock };
+    setSavingId(product.id);
+    queryClient.setQueryData<AdminDashboardData>(["admin-dashboard"], (old) =>
+      old ? { ...old, products: old.products.map((item) => (item.id === product.id ? updated : item)) } : old,
+    );
+    try {
+      const saved = await fetchUpdateProduct(updated);
+      await refreshProductQueries(queryClient, saved);
+    } catch (error) {
+      await refreshProductQueries(queryClient);
+      alert(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="mt-5 rounded-[18px] border border-border bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+        <div className="h-6 w-44 rounded bg-slate-200" />
+        <div className="mt-5 grid gap-3 sm:grid-cols-4">
+          {[...Array(4)].map((_, index) => <div key={index} className="h-20 rounded-2xl bg-slate-100" />)}
+        </div>
+      </div>
+    );
+  }
+
+  if (hasError) {
+    return (
+      <div className="mt-5 rounded-[18px] border border-destructive/30 bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+        <h2 className="font-display text-xl font-semibold">Inventory could not load</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Check that the API/database is running, then retry.</p>
+        <button onClick={() => void refreshProductQueries(queryClient)} className="mt-5 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-orange-600">
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-5 space-y-5">
+      <div className="rounded-[18px] border border-border bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">Inventory</p>
+            <h2 className="mt-1 font-display text-2xl font-bold">Stock control</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Quickly adjust stock and spot low inventory.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {([
+              ["all", "All"],
+              ["in-stock", "In stock"],
+              ["low-stock", "Low stock"],
+              ["out-of-stock", "Out"],
+            ] as Array<[InventoryFilter, string]>).map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setFilter(id)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  filter === id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-white text-muted-foreground hover:border-primary hover:text-primary"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-4">
+          <InventoryMetric label="Total units" value={totalUnits} />
+          <InventoryMetric label="Low stock" value={lowStockCount} />
+          <InventoryMetric label="Out of stock" value={outOfStockCount} />
+          <InventoryMetric label="Inventory value" value={formatPrice(inventoryValue)} />
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-[18px] border border-border bg-white shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+        {filteredProducts.length === 0 ? (
+          <p className="px-5 py-10 text-center text-sm text-muted-foreground">No products match this inventory filter.</p>
+        ) : (
+          <div className="divide-y divide-border">
+            {filteredProducts.map((product) => (
+              <InventoryRow key={product.id} product={product} saving={savingId === product.id} onSaveStock={saveStock} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function InventoryMetric({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-xl font-bold text-primary">{value}</p>
+    </div>
+  );
+}
+
+function InventoryRow({ product, saving, onSaveStock }: { product: Product; saving: boolean; onSaveStock: (product: Product, stock: number) => Promise<void> }) {
+  const [draftStock, setDraftStock] = useState(String(product.stock));
+  const status = getInventoryStatus(product.stock);
+
+  useEffect(() => {
+    setDraftStock(String(product.stock));
+  }, [product.stock]);
+
+  const parsedStock = Number(draftStock);
+  const canSave = Number.isInteger(parsedStock) && parsedStock >= 0 && parsedStock !== product.stock;
+
+  return (
+    <div className="grid gap-4 p-4 lg:grid-cols-[minmax(260px,1fr)_140px_220px] lg:items-center">
+      <div className="flex min-w-0 items-center gap-3">
+        <img src={product.image} alt={product.name} className="h-14 w-14 shrink-0 rounded-xl bg-slate-100 object-cover" />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold">{product.name}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{product.id} · {product.category}</p>
+        </div>
+      </div>
+      <div>
+        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getInventoryStatusClass(status)}`}>
+          {getInventoryLabel(product.stock, true)}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+        <button
+          onClick={() => void onSaveStock(product, product.stock - 1)}
+          disabled={saving || product.stock <= 0}
+          className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-white text-foreground transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label={`Decrease ${product.name} stock`}
+        >
+          <Minus className="h-4 w-4" />
+        </button>
+        <input
+          type="number"
+          min={0}
+          step={1}
+          value={draftStock}
+          onChange={(event) => setDraftStock(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && canSave) void onSaveStock(product, parsedStock);
+          }}
+          className="h-9 w-20 rounded-lg border border-border bg-white px-2 text-center text-sm font-semibold outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+        />
+        <button
+          onClick={() => void onSaveStock(product, product.stock + 1)}
+          disabled={saving}
+          className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-white text-foreground transition hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label={`Increase ${product.name} stock`}
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => void onSaveStock(product, parsedStock)}
+          disabled={saving || !canSave}
+          className="h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {saving ? "Saving" : "Save"}
+        </button>
       </div>
     </div>
   );

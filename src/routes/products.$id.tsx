@@ -4,6 +4,7 @@ import { Minus, Plus, ArrowLeft, Truck, RotateCcw, ShieldCheck } from "lucide-re
 import { useApiProduct, useApiRelatedProducts, categoryName, type Product } from "@/lib/products";
 import { formatPrice, useCart } from "@/lib/cart";
 import { ProductCard } from "@/components/ProductCard";
+import { getInventoryLabel, getInventoryStatus, getInventoryTextClass } from "@/lib/inventory";
 
 export const Route = createFileRoute("/products/$id")({
   loader: async ({ params }) => {
@@ -50,6 +51,7 @@ function ProductPage() {
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const inStock = product.stock > 0;
+  const inventoryStatus = getInventoryStatus(product.stock);
 
   const related = relatedProducts;
 
@@ -74,8 +76,8 @@ function ProductPage() {
           <p className="mt-4 text-2xl font-bold text-foreground">{formatPrice(product.price)}</p>
 
           <p className="mt-6 leading-relaxed text-muted-foreground">{product.description}</p>
-          <p className="mt-4 text-sm font-medium text-foreground">
-            {inStock ? `In stock: ${product.stock}` : "Out of stock"}
+          <p className={`mt-4 text-sm font-medium ${getInventoryTextClass(inventoryStatus)}`}>
+            {getInventoryLabel(product.stock, true)}
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
