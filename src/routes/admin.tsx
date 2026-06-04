@@ -17,8 +17,13 @@ import {
   type Category,
   type Product,
   type OrderRecord,
+  type OrderDetails,
+  type OrderStatus,
   type AdminDashboardData,
   type HomePageData,
+  orderStatuses,
+  fetchOrderDetails,
+  fetchUpdateOrderStatus,
   useApiAdminDashboard,
   fetchAdminDashboard,
 } from "@/lib/products";
@@ -811,6 +816,70 @@ function ProductsTab({ products, categories, loading, hasError }: { products: Pr
 }
 
 function OrdersTab({ orders, loading }: { orders: OrderRecord[]; loading: boolean }) {
+  const queryClient = useQueryClient();
+  const [selectedId, setSelectedId] = useState<number | null>(orders[0]?.id ?? null);
+  const [details, setDetails] = useState<OrderDetails | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [savingStatus, setSavingStatus] = useState(false);
+
+  useEffect(() => {
+    if (!orders.some((order) => order.id === selectedId)) {
+      setSelectedId(orders[0]?.id ?? null);
+    }
+  }, [orders, selectedId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedId) {
+      setDetails(null);
+      return;
+    }
+
+    setDetailsLoading(true);
+    fetchOrderDetails(selectedId)
+      .then((order) => {
+        if (!cancelled) setDetails(order);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setDetails(null);
+          alert(error instanceof Error ? error.message : String(error));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDetailsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId]);
+
+  async function updateStatus(status: OrderStatus) {
+    if (!details) return;
+    setSavingStatus(true);
+    try {
+      const updated = await fetchUpdateOrderStatus(details.id, status);
+      setDetails(updated);
+      queryClient.setQueryData<AdminDashboardData>(["admin-dashboard"], (old) =>
+        old
+          ? {
+              ...old,
+              orders: old.orders.map((order) =>
+                order.id === updated.id ? { ...order, status: updated.status } : order,
+              ),
+            }
+          : old,
+      );
+      queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSavingStatus(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -825,42 +894,152 @@ function OrdersTab({ orders, loading }: { orders: OrderRecord[]; loading: boolea
   }
 
   return (
-    <div>
-      <div className="flex justify-between gap-3">
-        <p className="text-sm text-muted-foreground">Showing {orders.length} order{orders.length === 1 ? "" : "s"}</p>
+    <div className="grid gap-5 xl:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.1fr)]">
+      <div>
+        <div className="flex justify-between gap-3">
+          <p className="text-sm text-muted-foreground">Showing {orders.length} order{orders.length === 1 ? "" : "s"}</p>
+        </div>
+        <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-card">
+          {orders.length === 0 ? (
+            <p className="px-5 py-10 text-center text-sm text-muted-foreground">No orders have been placed yet.</p>
+          ) : (
+            <div className="divide-y divide-border">
+              {orders.map((order) => (
+                <button
+                  key={order.id}
+                  type="button"
+                  onClick={() => setSelectedId(order.id)}
+                  className={`block w-full px-4 py-4 text-left transition hover:bg-muted/50 ${
+                    selectedId === order.id ? "bg-primary/10" : ""
+                  }`}
+                >
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-foreground">{order.orderNumber}</span>
+                      <span className="mt-1 block truncate text-xs text-muted-foreground">{order.name} · {order.email}</span>
+                    </span>
+                    <span className="shrink-0 text-sm font-semibold">{formatPrice(order.total)}</span>
+                  </span>
+                  <span className="mt-3 flex flex-wrap items-center gap-2">
+                    <OrderStatusBadge status={order.status ?? "pending"} />
+                    <span className="text-xs text-muted-foreground">{order.payment.toUpperCase()}</span>
+                    <span className="text-xs text-muted-foreground">{new Date(order.createdAt).toLocaleDateString()}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-      <div className="mt-5 overflow-hidden rounded-2xl border border-border bg-card">
-        {orders.length === 0 ? (
-          <p className="px-5 py-10 text-center text-sm text-muted-foreground">No orders have been placed yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-border bg-muted">
-                <tr>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Order</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Customer</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Email</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Total</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Paid</th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order) => (
-                  <tr key={order.id} className="border-b border-border hover:bg-muted/40">
-                    <td className="px-4 py-3 font-medium text-foreground">{order.orderNumber}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{order.name}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{order.email}</td>
-                    <td className="px-4 py-3 text-foreground">{formatPrice(order.total)}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{order.payment.toUpperCase()}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{new Date(order.createdAt).toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+      <div className="rounded-2xl border border-border bg-card p-5">
+        {!selectedId ? (
+          <p className="py-12 text-center text-sm text-muted-foreground">Select an order to see details.</p>
+        ) : detailsLoading ? (
+          <div className="space-y-3">
+            <div className="h-6 w-44 rounded bg-muted" />
+            <div className="h-20 rounded-2xl bg-muted" />
+            <div className="h-40 rounded-2xl bg-muted" />
           </div>
+        ) : details ? (
+          <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Order details</p>
+                <h2 className="mt-1 font-display text-xl font-bold">{details.orderNumber}</h2>
+                <p className="mt-1 text-xs text-muted-foreground">{new Date(details.createdAt).toLocaleString()}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <OrderStatusBadge status={details.status ?? "pending"} />
+                <select
+                  value={details.status ?? "pending"}
+                  onChange={(event) => void updateStatus(event.target.value as OrderStatus)}
+                  disabled={savingStatus}
+                  className="h-9 rounded-lg border border-border bg-background px-2 text-xs font-semibold outline-none focus:border-primary"
+                >
+                  {orderStatuses.map((status) => (
+                    <option key={status} value={status}>{formatOrderStatus(status)}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <OrderInfoBlock title="Customer" lines={[details.name, details.email, details.phone]} />
+              <OrderInfoBlock title="Shipping" lines={[details.address]} />
+            </div>
+
+            <div className="mt-5 overflow-hidden rounded-2xl border border-border">
+              <div className="border-b border-border bg-muted px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                Items
+              </div>
+              <div className="divide-y divide-border">
+                {details.items.map((item) => (
+                  <div key={item.productId} className="flex gap-3 p-4">
+                    <img src={item.image ?? ""} alt={item.name ?? item.productId} className="h-14 w-14 shrink-0 rounded-xl bg-muted object-cover" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">{item.name ?? item.productId}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Qty {item.qty} · {item.category ?? "Uncategorized"}</p>
+                    </div>
+                    <p className="shrink-0 text-sm font-semibold">{formatPrice(item.lineTotal)}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-2 rounded-2xl bg-muted p-4">
+              <OrderTotalRow label="Subtotal" value={formatPrice(details.subtotal)} />
+              <OrderTotalRow label="Shipping" value={details.shipping === 0 ? "Free" : formatPrice(details.shipping)} />
+              <OrderTotalRow label="Total" value={formatPrice(details.total)} emphasis />
+            </div>
+          </div>
+        ) : (
+          <p className="py-12 text-center text-sm text-muted-foreground">Order details could not be loaded.</p>
         )}
       </div>
+    </div>
+  );
+}
+
+function OrderStatusBadge({ status }: { status: string }) {
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${orderStatusClass(status)}`}>
+      {formatOrderStatus(status)}
+    </span>
+  );
+}
+
+function formatOrderStatus(status: string) {
+  return status.replace(/-/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function orderStatusClass(status: string) {
+  if (status === "cancelled") return "bg-destructive/10 text-destructive";
+  if (status === "delivered") return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200";
+  if (status === "shipped") return "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200";
+  if (status === "processing") return "bg-primary/10 text-primary";
+  if (status === "paid") return "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200";
+  return "bg-muted text-muted-foreground";
+}
+
+function OrderInfoBlock({ title, lines }: { title: string; lines: Array<string | undefined> }) {
+  return (
+    <div className="rounded-2xl bg-muted p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{title}</p>
+      <div className="mt-2 space-y-1">
+        {lines.filter(Boolean).map((line) => (
+          <p key={line} className="text-sm text-foreground">{line}</p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OrderTotalRow({ label, value, emphasis }: { label: string; value: string; emphasis?: boolean }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className={emphasis ? "font-semibold" : "text-sm text-muted-foreground"}>{label}</span>
+      <span className={emphasis ? "font-display text-lg font-bold" : "text-sm font-medium"}>{value}</span>
     </div>
   );
 }

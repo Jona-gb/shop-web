@@ -13,6 +13,8 @@ import {
   deleteProduct,
   resetStore,
   getOrders,
+  getOrderDetails,
+  updateOrderStatus,
   getCartItems,
   setCartItems,
   clearCartItems,
@@ -46,6 +48,8 @@ const checkoutSchema = {
   payment: { required: true, type: 'string' },
   items: { required: true, type: 'array' },
 };
+
+const orderStatuses = new Set(['pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled']);
 
 // Utility functions
 function json(data, status = 200, headers = {}) {
@@ -271,6 +275,29 @@ export async function handleApiRequest(request) {
 
   if (path === '/api/admin/orders' && request.method === 'GET') {
     return json(await getOrders());
+  }
+
+  if (path.startsWith('/api/admin/orders/') && request.method === 'GET') {
+    const id = Number(path.replace('/api/admin/orders/', ''));
+    if (!Number.isInteger(id) || id <= 0) {
+      return badRequest({ error: 'Valid order id is required.' });
+    }
+    const order = await getOrderDetails(id);
+    if (!order) return json({ error: 'Order not found' }, 404);
+    return json(order);
+  }
+
+  if (path.startsWith('/api/admin/orders/') && path.endsWith('/status') && request.method === 'PUT') {
+    const id = Number(path.replace('/api/admin/orders/', '').replace('/status', ''));
+    const body = await parseRequestBody(request);
+    if (!Number.isInteger(id) || id <= 0) {
+      return badRequest({ error: 'Valid order id is required.' });
+    }
+    if (!body || typeof body.status !== 'string' || !orderStatuses.has(body.status)) {
+      return badRequest({ error: 'Valid order status is required.' });
+    }
+    const order = await updateOrderStatus(id, body.status);
+    return json(order, 200, { 'cache-control': 'no-store' });
   }
 
   if (path === '/api/cart' && request.method === 'GET') {

@@ -100,6 +100,17 @@ export async function getOrders() {
   return apiCall('/api/admin/orders');
 }
 
+export async function getOrderDetails(id) {
+  return apiCall(`/api/admin/orders/${id}`);
+}
+
+export async function updateOrderStatus(id, status) {
+  return apiCall(`/api/admin/orders/${id}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ status }),
+  });
+}
+
 export async function getCategories_Admin() {
   return apiCall('/api/categories');
 }

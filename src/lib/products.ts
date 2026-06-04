@@ -26,10 +26,28 @@ export type OrderRecord = {
   email: string;
   address: string;
   payment: string;
+  status: OrderStatus;
   subtotal: number;
   shipping: number;
   total: number;
   createdAt: string;
+};
+
+export const orderStatuses = ["pending", "paid", "processing", "shipped", "delivered", "cancelled"] as const;
+export type OrderStatus = (typeof orderStatuses)[number];
+
+export type OrderDetailItem = {
+  productId: string;
+  qty: number;
+  lineTotal: number;
+  name?: string;
+  category?: string;
+  price?: number;
+  image?: string;
+};
+
+export type OrderDetails = OrderRecord & {
+  items: OrderDetailItem[];
 };
 
 export const seedCategories: Category[] = [
@@ -245,6 +263,25 @@ export async function fetchOrders(): Promise<OrderRecord[]> {
   }
 
   return fetchApi<OrderRecord[]>("/api/admin/orders");
+}
+
+export async function fetchOrderDetails(id: number): Promise<OrderDetails> {
+  if (import.meta.env.SSR) {
+    const { getOrderDetails } = await import("@/lib/db");
+    const order = await getOrderDetails(id);
+    if (!order) throw new Error("Order not found");
+    return order as OrderDetails;
+  }
+
+  return fetchApi<OrderDetails>(`/api/admin/orders/${encodeURIComponent(String(id))}`);
+}
+
+export function fetchUpdateOrderStatus(id: number, status: OrderStatus): Promise<OrderDetails> {
+  return apiRequest<OrderDetails>(`/api/admin/orders/${encodeURIComponent(String(id))}/status`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
 }
 
 export function fetchUpdateProduct(product: Product): Promise<Product> {

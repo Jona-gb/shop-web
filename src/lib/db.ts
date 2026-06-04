@@ -130,11 +130,25 @@ async function initSchema(pool: Pool) {
       email TEXT NOT NULL,
       address TEXT NOT NULL,
       payment VARCHAR(50) NOT NULL,
+      status VARCHAR(50) NOT NULL DEFAULT 'pending',
       subtotal DOUBLE NOT NULL,
       shipping DOUBLE NOT NULL,
       total DOUBLE NOT NULL,
       createdAt DATETIME NOT NULL
     )`);
+
+  try {
+    await pool.query("ALTER TABLE orders ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT 'pending'");
+  } catch (err) {
+    if (
+      !(
+        err &&
+        (err.code === 'ER_DUP_FIELDNAME' || (typeof err.message === 'string' && err.message.includes('Duplicate column')))
+      )
+    ) {
+      throw err;
+    }
+  }
 
   await pool.query(`CREATE TABLE IF NOT EXISTS order_items (
       orderId BIGINT NOT NULL,
@@ -599,10 +613,25 @@ export type OrderRecord = {
   email: string;
   address: string;
   payment: string;
+  status: string;
   subtotal: number;
   shipping: number;
   total: number;
   createdAt: string;
+};
+
+export type OrderDetailItem = {
+  productId: string;
+  qty: number;
+  lineTotal: number;
+  name?: string;
+  category?: string;
+  price?: number;
+  image?: string;
+};
+
+export type OrderDetailsRecord = OrderRecord & {
+  items: OrderDetailItem[];
 };
 
 export async function createOrder(order: {
@@ -612,6 +641,7 @@ export async function createOrder(order: {
   email: string;
   address: string;
   payment: string;
+  status?: string;
   subtotal: number;
   shipping: number;
   total: number;
@@ -647,8 +677,8 @@ export async function createOrder(order: {
     }
 
     const [result] = await connection.query<import("mysql2").OkPacket>(
-      `INSERT INTO orders (orderNumber, name, phone, email, address, payment, subtotal, shipping, total, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO orders (orderNumber, name, phone, email, address, payment, status, subtotal, shipping, total, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         order.orderNumber,
         order.name,
@@ -656,6 +686,7 @@ export async function createOrder(order: {
         order.email,
         order.address,
         order.payment,
+        order.status ?? "pending",
         order.subtotal,
         order.shipping,
         order.total,
@@ -693,4 +724,44 @@ export async function getOrders(): Promise<OrderRecord[]> {
   const pool = await poolPromise;
   const [rows] = await pool.query<RowDataPacket[]>("SELECT * FROM orders ORDER BY createdAt DESC");
   return rows as OrderRecord[];
+}
+
+export async function getOrderDetails(id: number): Promise<OrderDetailsRecord | undefined> {
+  await ensureInitialized();
+  const pool = await poolPromise;
+  const [orderRows] = await pool.query<RowDataPacket[]>("SELECT * FROM orders WHERE id = ?", [id]);
+  const order = orderRows[0] as OrderRecord | undefined;
+  if (!order) return undefined;
+
+  const [items] = await pool.query<RowDataPacket[]>(
+    `SELECT
+       oi.productId,
+       oi.qty,
+       oi.lineTotal,
+       p.name,
+       p.category,
+       p.price,
+       p.image
+     FROM order_items oi
+     LEFT JOIN products p ON p.id = oi.productId
+     WHERE oi.orderId = ?
+     ORDER BY p.name`,
+    [id],
+  );
+
+  return { ...order, items: items as OrderDetailItem[] };
+}
+
+export async function updateOrderStatus(id: number, status: string): Promise<OrderDetailsRecord> {
+  await ensureInitialized();
+  const pool = await poolPromise;
+  const [result] = await pool.query<import("mysql2").OkPacket>("UPDATE orders SET status = ? WHERE id = ?", [status, id]);
+  if (result.affectedRows === 0) {
+    throw new Error("Order not found.");
+  }
+  const order = await getOrderDetails(id);
+  if (!order) {
+    throw new Error("Order not found.");
+  }
+  return order;
 }

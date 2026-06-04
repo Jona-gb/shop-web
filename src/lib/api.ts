@@ -13,6 +13,8 @@ import {
   deleteProduct,
   resetStore,
   getOrders,
+  getOrderDetails,
+  updateOrderStatus,
   getCartItems,
   setCartItems,
   clearCartItems,
@@ -45,6 +47,8 @@ function json(data: unknown, status = 200, headers: Record<string, string> = {})
 function badRequest(payload: unknown, headers?: Record<string, string>) {
   return json(payload, 400, headers);
 }
+
+const orderStatuses = new Set(["pending", "paid", "processing", "shipped", "delivered", "cancelled"]);
 
 const maxProductImageBytes = 5 * 1024 * 1024;
 const productImageTypes = new Map([
@@ -264,6 +268,29 @@ export async function handleApiRequest(request: Request): Promise<Response> {
 
   if (path === "/api/admin/orders" && request.method === "GET") {
     return json(await getOrders(), 200, { "cache-control": "no-store" });
+  }
+
+  if (path.startsWith("/api/admin/orders/") && request.method === "GET") {
+    const id = Number(path.replace("/api/admin/orders/", ""));
+    if (!Number.isInteger(id) || id <= 0) {
+      return badRequest({ error: "Valid order id is required." }, { "cache-control": "no-store" });
+    }
+    const order = await getOrderDetails(id);
+    if (!order) return json({ error: "Order not found" }, 404, { "cache-control": "no-store" });
+    return json(order, 200, { "cache-control": "no-store" });
+  }
+
+  if (path.startsWith("/api/admin/orders/") && path.endsWith("/status") && request.method === "PUT") {
+    const id = Number(path.replace("/api/admin/orders/", "").replace("/status", ""));
+    const body = await parseRequestBody(request);
+    if (!Number.isInteger(id) || id <= 0) {
+      return badRequest({ error: "Valid order id is required." }, { "cache-control": "no-store" });
+    }
+    if (!body || typeof (body as Record<string, unknown>).status !== "string" || !orderStatuses.has((body as Record<string, string>).status)) {
+      return badRequest({ error: "Valid order status is required." }, { "cache-control": "no-store" });
+    }
+    const order = await updateOrderStatus(id, (body as Record<string, string>).status);
+    return json(order, 200, { "cache-control": "no-store" });
   }
 
   if (path === "/api/cart" && request.method === "GET") {

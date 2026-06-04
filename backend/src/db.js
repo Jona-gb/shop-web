@@ -240,11 +240,25 @@ async function initSchema(pool) {
       email TEXT NOT NULL,
       address TEXT NOT NULL,
       payment VARCHAR(50) NOT NULL,
+      status VARCHAR(50) NOT NULL DEFAULT 'pending',
       subtotal DOUBLE NOT NULL,
       shipping DOUBLE NOT NULL,
       total DOUBLE NOT NULL,
       createdAt DATETIME NOT NULL
     )`);
+
+  try {
+    await pool.query("ALTER TABLE orders ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT 'pending'");
+  } catch (err) {
+    if (
+      !(
+        err &&
+        (err.code === 'ER_DUP_FIELDNAME' || (typeof err.message === 'string' && err.message.includes('Duplicate column')))
+      )
+    ) {
+      throw err;
+    }
+  }
 
   await pool.query(`CREATE TABLE IF NOT EXISTS order_items (
       orderId BIGINT NOT NULL,
@@ -766,8 +780,8 @@ export async function createOrder(order) {
     }
 
     const [result] = await connection.query(
-      `INSERT INTO orders (orderNumber, name, phone, email, address, payment, subtotal, shipping, total, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO orders (orderNumber, name, phone, email, address, payment, status, subtotal, shipping, total, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         order.orderNumber,
         order.name,
@@ -775,6 +789,7 @@ export async function createOrder(order) {
         order.email,
         order.address,
         order.payment,
+        order.status ?? 'pending',
         order.subtotal,
         order.shipping,
         order.total,
@@ -813,6 +828,43 @@ export async function getOrders() {
   const pool = await poolPromise;
   const [rows] = await pool.query('SELECT * FROM orders ORDER BY createdAt DESC');
   return rows;
+}
+
+export async function getOrderDetails(id) {
+  await ensureInitialized();
+  const pool = await poolPromise;
+  const [orderRows] = await pool.query('SELECT * FROM orders WHERE id = ?', [id]);
+  const order = orderRows[0];
+  if (!order) return undefined;
+
+  const [items] = await pool.query(
+    `SELECT
+       oi.productId,
+       oi.qty,
+       oi.lineTotal,
+       p.name,
+       p.category,
+       p.price,
+       p.image
+     FROM order_items oi
+     LEFT JOIN products p ON p.id = oi.productId
+     WHERE oi.orderId = ?
+     ORDER BY p.name`,
+    [id],
+  );
+
+  return { ...order, items };
+}
+
+export async function updateOrderStatus(id, status) {
+  await ensureInitialized();
+  const pool = await poolPromise;
+  const [result] = await pool.query('UPDATE orders SET status = ? WHERE id = ?', [status, id]);
+  if (result.affectedRows === 0) {
+    throw new Error('Order not found.');
+  }
+  clearAllCache();
+  return getOrderDetails(id);
 }
 
 function slugify(str) {
