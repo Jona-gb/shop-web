@@ -39,11 +39,11 @@ function HomePage() {
 
   return (
     <div className="bg-background text-foreground">
-      <section className="border-b border-border bg-[#f8fafc]">
+      <section className="border-b border-border bg-[#fff7ed] dark:bg-background">
         <div className="shop-container grid gap-8 py-12 lg:grid-cols-[0.9fr_1.1fr] lg:items-center lg:py-16">
           <div>
             <p className="section-kicker">QuickShop</p>
-            <h1 className="mt-3 font-display text-4xl font-bold leading-tight tracking-tight text-slate-950 sm:text-5xl">
+            <h1 className="mt-3 font-display text-4xl font-bold leading-tight tracking-tight text-foreground sm:text-5xl">
               Simple shopping for everyday products.
             </h1>
             <p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground">
@@ -52,7 +52,7 @@ function HomePage() {
             <div className="mt-7 flex flex-wrap gap-3">
               <Link
                 to="/products"
-                className="inline-flex h-12 items-center gap-2 rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground transition hover:bg-blue-600"
+                className="inline-flex h-12 items-center gap-2 rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground transition hover:bg-orange-600"
               >
                 Shop products
                 <ArrowRight className="h-4 w-4" />
@@ -61,7 +61,7 @@ function HomePage() {
                 <Link
                   to="/products"
                   search={{ category: categories[0].slug }}
-                  className="inline-flex h-12 items-center rounded-full border border-border bg-white px-6 text-sm font-semibold text-foreground transition hover:border-primary hover:text-primary"
+                  className="inline-flex h-12 items-center rounded-full border border-border bg-card px-6 text-sm font-semibold text-foreground transition hover:border-primary hover:text-primary"
                 >
                   Browse categories
                 </Link>
@@ -72,7 +72,7 @@ function HomePage() {
           <Link
             to={heroProduct ? "/products/$id" : "/products"}
             params={heroProduct ? { id: heroProduct.id } : undefined}
-            className="group relative grid min-h-[340px] place-items-center overflow-hidden rounded-[28px] border border-border bg-white p-8 shadow-[0_24px_60px_rgba(15,23,42,0.08)]"
+            className="group relative grid min-h-[340px] place-items-center overflow-hidden rounded-[28px] border border-border bg-card p-8 shadow-[0_24px_60px_rgba(15,23,42,0.08)] dark:shadow-[0_24px_60px_rgba(0,0,0,0.28)]"
           >
             {heroProduct ? (
               <>
@@ -81,7 +81,7 @@ function HomePage() {
                   alt={heroProduct.name}
                   className="h-full max-h-[320px] w-full object-contain transition duration-500 group-hover:scale-105"
                 />
-                <div className="absolute bottom-5 left-5 right-5 rounded-2xl bg-slate-950 px-4 py-3 text-white">
+                <div className="absolute bottom-5 left-5 right-5 rounded-2xl bg-[#111827] px-4 py-3 text-white ring-1 ring-black/5">
                   <p className="truncate text-sm font-semibold">{heroProduct.name}</p>
                   <p className="mt-1 text-xs text-white/70">
                     {heroProduct.stock > 0 ? `${heroProduct.stock} in stock` : "Out of stock"}
@@ -118,12 +118,12 @@ function HomePage() {
                   key={category.slug}
                   to="/products"
                   search={{ category: category.slug }}
-                  className="group rounded-2xl border border-border bg-white p-4 transition hover:-translate-y-0.5 hover:border-primary hover:shadow-[0_16px_40px_rgba(15,23,42,0.08)]"
+                  className="group rounded-2xl border border-border bg-card p-4 transition hover:-translate-y-0.5 hover:border-primary hover:shadow-[0_16px_40px_rgba(15,23,42,0.08)] dark:hover:shadow-[0_16px_40px_rgba(0,0,0,0.28)]"
                 >
                   <span className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary transition group-hover:bg-primary group-hover:text-white">
                     <Icon className="h-5 w-5" />
                   </span>
-                  <h3 className="mt-4 truncate text-sm font-semibold">{category.name}</h3>
+                  <h3 className="mt-4 truncate text-sm font-semibold text-foreground">{category.name}</h3>
                   <p className="mt-1 text-xs text-muted-foreground">{category.count} products</p>
                 </Link>
               );
@@ -132,7 +132,7 @@ function HomePage() {
         </section>
       )}
 
-      <section className="border-y border-border bg-white py-12">
+      <section className="border-y border-border bg-background py-12">
         <div className="shop-container">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>

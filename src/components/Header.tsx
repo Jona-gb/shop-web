@@ -49,7 +49,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 bg-slate-950 text-white shadow-sm shadow-black/20">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-24 overflow-hidden">
-        <div className="h-full bg-[radial-gradient(circle_at_20%_0%,rgba(37,99,235,0.22),transparent_28%),radial-gradient(circle_at_85%_15%,rgba(255,107,90,0.18),transparent_24%)]" />
+        <div className="h-full bg-[radial-gradient(circle_at_20%_0%,rgba(249,115,22,0.24),transparent_28%),radial-gradient(circle_at_85%_15%,rgba(251,146,60,0.18),transparent_24%)]" />
       </div>
       <div className="relative hidden border-b border-slate-800 bg-slate-950 text-slate-300 text-[11px] backdrop-blur md:block">
         <div className="mx-auto flex h-8 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -57,7 +57,7 @@ export function Header() {
             <span>English</span>
             <span className="inline-flex items-center gap-1">USD <ChevronDown className="h-3 w-3" /></span>
             <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-              <Sparkles className="h-3 w-3 text-[#ff6b5a]" />
+              <Sparkles className="h-3 w-3 text-primary" />
               Free shipping on all orders over $100
             </span>
           </div>
@@ -79,11 +79,11 @@ export function Header() {
         </button>
 
         <Link to="/" className="group flex shrink-0 items-center gap-2.5">
-          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white text-[#111827] shadow-[0_12px_24px_rgba(0,0,0,0.16)] transition group-hover:-rotate-3 group-hover:scale-105">
+          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-[0_12px_24px_rgba(249,115,22,0.22)] transition group-hover:-rotate-3 group-hover:scale-105">
             <ShoppingBag className="h-5 w-5" />
           </span>
           <span className="font-display text-xl font-bold tracking-tight text-white">
-            Quick<span className="ml-1 rounded-full bg-[#ff6b5a] px-1.5 py-0.5 text-[11px] text-white">Shop</span>
+            Quick<span className="ml-1 rounded-full bg-primary px-1.5 py-0.5 text-[11px] text-primary-foreground">Shop</span>
           </span>
         </Link>
 
@@ -92,7 +92,7 @@ export function Header() {
             to="/"
             activeOptions={{ exact: true }}
             className="rounded-full px-3.5 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-800/80 hover:text-white"
-            activeProps={{ className: "bg-primary text-primary-foreground shadow-sm hover:bg-blue-600 hover:text-primary-foreground" }}
+            activeProps={{ className: "bg-primary text-primary-foreground shadow-sm hover:bg-orange-600 hover:text-primary-foreground" }}
           >
             Home
           </Link>
@@ -100,7 +100,7 @@ export function Header() {
             to="/products"
             activeOptions={{ includeSearch: false }}
             className="rounded-full px-3.5 py-2 text-xs font-semibold text-slate-300 transition hover:bg-slate-800/80 hover:text-white"
-            activeProps={{ className: "bg-primary text-primary-foreground shadow-sm hover:bg-blue-600 hover:text-primary-foreground" }}
+            activeProps={{ className: "bg-primary text-primary-foreground shadow-sm hover:bg-orange-600 hover:text-primary-foreground" }}
           >
             Our Store
           </Link>
@@ -162,14 +162,14 @@ export function Header() {
                     <Link
                       to="/dashboard"
                       onClick={() => setMenu(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-white transition hover:bg-slate-800/80"
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-foreground transition hover:bg-muted"
                     >
                       <LayoutDashboard className="h-4 w-4" /> Admin dashboard
                     </Link>
                   )}
                   <button
                     onClick={handleLogout}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-white transition hover:bg-slate-800/80"
+                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-foreground transition hover:bg-muted"
                   >
                     <LogOut className="h-4 w-4" /> Sign out
                   </button>
@@ -194,7 +194,7 @@ export function Header() {
           >
             <ShoppingBag className="h-5 w-5" />
             {count > 0 && (
-              <span className="absolute -right-2 -top-2 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#ff6b5a] px-1 text-xs font-bold text-white">
+              <span className="absolute -right-2 -top-2 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-primary-foreground">
                 {count}
               </span>
             )}
@@ -234,7 +234,7 @@ export function Header() {
               <Link
                 to="/dashboard"
                 onClick={() => setOpen(false)}
-                className="mt-2 rounded-2xl bg-sky-500 px-3 py-2.5 text-sm font-semibold text-white"
+                className="mt-2 rounded-2xl bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground"
               >
                 Admin dashboard
               </Link>
@@ -244,7 +244,7 @@ export function Header() {
                 to="/login"
                 search={{ redirect: "/" }}
                 onClick={() => setOpen(false)}
-                className="mt-2 rounded-2xl bg-sky-500 px-3 py-2.5 text-sm font-semibold text-white"
+                className="mt-2 rounded-2xl bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground"
               >
                 Sign in
               </Link>
@@ -255,6 +255,3 @@ export function Header() {
     </header>
   );
 }
-
-
-

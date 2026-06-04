@@ -54,7 +54,7 @@ function SignupPage() {
           <section className="w-full max-w-[440px] rounded-lg border border-slate-200 bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.10)] sm:p-8 dark:border-slate-800 dark:bg-slate-900">
             <div className="mb-7 flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#ff6b5a]">Join</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Join</p>
                 <h1 className="mt-3 font-display text-3xl font-semibold tracking-normal text-slate-950 dark:text-white">
                   Create account
                 </h1>
@@ -138,7 +138,7 @@ function SignupPage() {
               <Link
                 to="/login"
                 search={{ redirect: redirectTo }}
-                className="font-semibold text-slate-950 transition hover:text-[#ff6b5a] dark:text-white"
+                className="font-semibold text-slate-950 transition hover:text-primary dark:text-white"
               >
                 Sign in
               </Link>
@@ -154,7 +154,7 @@ function Field({ label, icon, children }: { label: string; icon: React.ReactNode
   return (
     <label className="block">
       <span className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">{label}</span>
-      <span className="flex h-12 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 focus-within:border-blue-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-950 dark:focus-within:bg-slate-900">
+      <span className="flex h-12 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 focus-within:border-primary focus-within:bg-white focus-within:ring-4 focus-within:ring-primary/10 dark:border-slate-700 dark:bg-slate-950 dark:focus-within:bg-slate-900">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-white text-slate-500 shadow-sm dark:bg-slate-900 dark:text-slate-400">
           {icon}
         </span>

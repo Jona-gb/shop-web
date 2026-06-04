@@ -231,7 +231,7 @@ export function AdminPage() {
                 <span className="text-accent">*</span>
               </div>
               <p className="text-xs leading-5 text-white/68">Live catalog, orders, and customer data.</p>
-              <button onClick={logout} className="mt-4 inline-flex h-8 items-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition hover:bg-blue-600">
+              <button onClick={logout} className="mt-4 inline-flex h-8 items-center gap-2 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition hover:bg-orange-600">
                 <LogOut className="h-3.5 w-3.5" />
                 Sign out
               </button>
@@ -303,8 +303,8 @@ export function AdminPage() {
                       <button className="rounded-lg bg-slate-100 px-3 py-1.5 text-[11px] font-semibold">1 month</button>
                     </div>
                     <div className="grid gap-3 md:grid-cols-[1fr_1fr_72px]">
-                      <SpendingCard title="Revenue" value={ordersLoading ? "Loading..." : formatPrice(totalRevenue)} detail={ordersLoading ? "Syncing orders" : `${totalOrders} order${totalOrders === 1 ? "" : "s"}`} percent={revenuePercent} color="#2563eb" />
-                      <SpendingCard title="Catalog value" value={formatPrice(inventoryValue)} detail={`${totalProducts} product${totalProducts === 1 ? "" : "s"}`} percent={orderPercent} color="#ff6b5a" />
+                      <SpendingCard title="Revenue" value={ordersLoading ? "Loading..." : formatPrice(totalRevenue)} detail={ordersLoading ? "Syncing orders" : `${totalOrders} order${totalOrders === 1 ? "" : "s"} processed`} percent={revenuePercent} color="#f97316" />
+                      <SpendingCard title="Catalog value" value={formatPrice(inventoryValue)} detail={`${totalProducts} product${totalProducts === 1 ? "" : "s"}`} percent={orderPercent} color="#fb923c" />
                       <button onClick={() => setTab("products")} className="grid min-h-24 place-items-center rounded-[18px] border border-dashed border-slate-300 bg-white text-xs font-semibold text-slate-600 transition hover:border-primary hover:text-primary">
                         <span className="grid gap-1 text-center">
                           <Plus className="mx-auto h-4 w-4" />
@@ -331,8 +331,8 @@ export function AdminPage() {
                               return [formatPrice(Number(value)), "Revenue"];
                             }}
                           />
-                          <Bar dataKey="revenue" fill="#2563eb" radius={[5, 5, 0, 0]} barSize={9} />
-                          <Bar dataKey="orders" fill="#ff6b5a" radius={[5, 5, 0, 0]} barSize={9} />
+                          <Bar dataKey="revenue" fill="#f97316" radius={[5, 5, 0, 0]} barSize={9} />
+                          <Bar dataKey="orders" fill="#fb923c" radius={[5, 5, 0, 0]} barSize={9} />
                         </RechartsBarChart>
                       </ResponsiveContainer>
                     </div>
@@ -477,7 +477,7 @@ function SidebarLink({
     <button
       onClick={onClick}
       className={`flex shrink-0 items-center gap-3 rounded-lg px-3.5 py-2.5 text-left text-sm font-semibold transition lg:w-full ${
-        active ? "bg-primary text-primary-foreground shadow-[0_10px_20px_rgba(37,99,235,0.22)]" : "text-slate-300 hover:bg-slate-800 hover:text-white"
+        active ? "bg-primary text-primary-foreground shadow-[0_10px_20px_rgba(249,115,22,0.22)]" : "text-slate-300 hover:bg-slate-800 hover:text-white"
       }`}
     >
       {icon}
@@ -702,7 +702,7 @@ function ProductsTab({ products, categories, loading, hasError }: { products: Pr
           onClick={() => {
             void refreshProductQueries(queryClient);
           }}
-          className="mt-5 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-blue-600"
+          className="mt-5 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-orange-600"
         >
           Retry
         </button>
@@ -1006,7 +1006,7 @@ function OverviewTab({ orders, products, users, loading }: { orders: OrderRecord
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                 <Tooltip formatter={(value) => [formatPrice(Number(value)), "Revenue"]} />
-                <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={3} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="value" stroke="#f97316" strokeWidth={3} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -1240,7 +1240,7 @@ function AnalyticsTab({ orders, products, users, loading }: { orders: OrderRecor
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                 <Tooltip formatter={(value) => [formatPrice(Number(value)), "Revenue"]} />
-                <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={3} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="value" stroke="#f97316" strokeWidth={3} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>

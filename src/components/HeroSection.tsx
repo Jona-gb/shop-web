@@ -27,7 +27,7 @@ export function HeroSection({
       <div className="shop-container py-6">
         <div className="relative grid min-h-[520px] items-center overflow-hidden rounded-[2rem] border border-border bg-card px-5 py-10 shadow-[0_28px_70px_rgba(15,23,42,0.08)] sm:px-8 md:grid-cols-[0.86fr_1.14fr] md:py-0 lg:px-14">
           <div className="absolute left-8 top-8 h-24 w-24 rounded-full border border-white/70" />
-          <div className="absolute bottom-8 right-[42%] h-16 w-16 rounded-full bg-[#ff6b5a]/20 blur-xl" />
+          <div className="absolute bottom-8 right-[42%] h-16 w-16 rounded-full bg-primary/20 blur-xl" />
 
           <div className="z-10 flex max-w-xl flex-col items-start gap-5">
             <p className="section-kicker">Curated everyday tech</p>
@@ -49,7 +49,7 @@ export function HeroSection({
             <div className="flex flex-wrap items-center gap-4">
               <Link
                 to={primaryCtaLink}
-                className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-[0_12px_28px_rgba(37,99,235,0.25)] transition hover:-translate-y-0.5 hover:bg-blue-600"
+                className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground shadow-[0_12px_28px_rgba(249,115,22,0.25)] transition hover:-translate-y-0.5 hover:bg-orange-600"
               >
                 {primaryCtaText}
               </Link>
@@ -70,8 +70,8 @@ export function HeroSection({
               className="relative h-full w-full object-contain object-center drop-shadow-[0_28px_45px_rgba(32,25,17,0.2)] md:object-right"
             />
             <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 gap-1.5">
-              <span className="h-2 w-6 rounded-full bg-[#2563eb]" />
-              <span className="h-2 w-2 rounded-full bg-[#ff6b5a]" />
+              <span className="h-2 w-6 rounded-full bg-primary" />
+              <span className="h-2 w-2 rounded-full bg-accent" />
             </div>
           </div>
         </div>
