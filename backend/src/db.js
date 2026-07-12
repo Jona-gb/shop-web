@@ -1,6 +1,6 @@
-import { createPool } from 'mysql2/promise';
-import bcrypt from 'bcrypt';
-import { createHash } from 'crypto';
+import { createPool } from "mysql2/promise";
+import bcrypt from "bcrypt";
+import { createHash } from "crypto";
 
 const CACHE_TTL = 60_000;
 const cache = new Map();
@@ -36,103 +36,103 @@ function clearAllCache() {
 
 // Seed data
 export const seedCategories = [
-  { slug: 'electronics', name: 'Electronics' },
-  { slug: 'gadgets', name: 'Gadgets' },
-  { slug: 'accessories', name: 'Accessories' },
+  { slug: "electronics", name: "Electronics" },
+  { slug: "gadgets", name: "Gadgets" },
+  { slug: "accessories", name: "Accessories" },
 ];
 
 export const seedProducts = [
   {
-    id: '1',
-    name: 'Wireless Headphones',
-    category: 'electronics',
+    id: "1",
+    name: "Wireless Headphones",
+    category: "electronics",
     price: 89.99,
     stock: 12,
-    image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&h=500&fit=crop',
-    description: 'Premium wireless headphones with noise cancellation',
+    image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&h=500&fit=crop",
+    description: "Premium wireless headphones with noise cancellation",
     isNew: true,
     isFeatured: true,
   },
   {
-    id: '2',
-    name: 'USB-C Cable',
-    category: 'accessories',
+    id: "2",
+    name: "USB-C Cable",
+    category: "accessories",
     price: 14.99,
     stock: 30,
-    image: 'https://images.unsplash.com/photo-1625948515291-69613efd103f?w=500&h=500&fit=crop',
-    description: 'Durable USB-C charging and data cable',
+    image: "https://images.unsplash.com/photo-1625948515291-69613efd103f?w=500&h=500&fit=crop",
+    description: "Durable USB-C charging and data cable",
     isNew: false,
     isFeatured: false,
   },
   {
-    id: '3',
-    name: 'Phone Stand',
-    category: 'gadgets',
+    id: "3",
+    name: "Phone Stand",
+    category: "gadgets",
     price: 19.99,
     stock: 18,
-    image: 'https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=500&h=500&fit=crop',
-    description: 'Adjustable phone stand for any device',
+    image: "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=500&h=500&fit=crop",
+    description: "Adjustable phone stand for any device",
     isNew: true,
     isFeatured: true,
   },
   {
-    id: '4',
-    name: 'Power Bank',
-    category: 'gadgets',
+    id: "4",
+    name: "Power Bank",
+    category: "gadgets",
     price: 39.99,
     stock: 14,
-    image: 'https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=500&h=500&fit=crop',
-    description: '20000mAh portable power bank',
+    image: "https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=500&h=500&fit=crop",
+    description: "20000mAh portable power bank",
     isNew: false,
     isFeatured: false,
   },
   {
-    id: '5',
-    name: 'Screen Protector',
-    category: 'accessories',
+    id: "5",
+    name: "Screen Protector",
+    category: "accessories",
     price: 9.99,
     stock: 50,
-    image: 'https://images.unsplash.com/photo-1613141065903-85a20c25910a?w=500&h=500&fit=crop',
-    description: 'Tempered glass screen protector',
+    image: "https://images.unsplash.com/photo-1613141065903-85a20c25910a?w=500&h=500&fit=crop",
+    description: "Tempered glass screen protector",
     isNew: false,
     isFeatured: false,
   },
   {
-    id: '6',
-    name: 'Wireless Mouse',
-    category: 'electronics',
+    id: "6",
+    name: "Wireless Mouse",
+    category: "electronics",
     price: 49.99,
     stock: 22,
-    image: 'https://images.unsplash.com/photo-1527814050087-3793815479db?w=500&h=500&fit=crop',
-    description: 'Silent wireless mouse with precision tracking',
+    image: "https://images.unsplash.com/photo-1527814050087-3793815479db?w=500&h=500&fit=crop",
+    description: "Silent wireless mouse with precision tracking",
     isNew: true,
     isFeatured: true,
   },
   {
-    id: '7',
-    name: 'Mechanical Keyboard',
-    category: 'electronics',
+    id: "7",
+    name: "Mechanical Keyboard",
+    category: "electronics",
     price: 129.99,
     stock: 10,
-    image: 'https://images.unsplash.com/photo-1587829191301-723ee259d07e?w=500&h=500&fit=crop',
-    description: 'RGB mechanical keyboard with custom switches',
+    image: "https://images.unsplash.com/photo-1587829191301-723ee259d07e?w=500&h=500&fit=crop",
+    description: "RGB mechanical keyboard with custom switches",
     isNew: false,
     isFeatured: false,
   },
   {
-    id: '8',
-    name: 'Phone Case',
-    category: 'accessories',
+    id: "8",
+    name: "Phone Case",
+    category: "accessories",
     price: 24.99,
     stock: 40,
-    image: 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=500&h=500&fit=crop',
-    description: 'Durable protective phone case',
+    image: "https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=500&h=500&fit=crop",
+    description: "Durable protective phone case",
     isNew: false,
     isFeatured: false,
   },
 ];
 
-const DATABASE_URL = process.env.DATABASE_URL || 'mysql://root@127.0.0.1:3306/shopdb';
+const DATABASE_URL = process.env.DATABASE_URL || "mysql://root@127.0.0.1:3306/shopdb";
 
 function parseDatabaseUrl(urlString) {
   const url = new URL(urlString);
@@ -141,7 +141,7 @@ function parseDatabaseUrl(urlString) {
     port: Number(url.port) || 3306,
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
-    database: url.pathname?.slice(1) || 'shopdb',
+    database: url.pathname?.slice(1) || "shopdb",
   };
 }
 
@@ -197,12 +197,13 @@ async function initSchema(pool) {
     )`);
 
   try {
-    await pool.query('ALTER TABLE products ADD COLUMN stock INT NOT NULL DEFAULT 0');
+    await pool.query("ALTER TABLE products ADD COLUMN stock INT NOT NULL DEFAULT 0");
   } catch (err) {
     if (
       !(
         err &&
-        (err.code === 'ER_DUP_FIELDNAME' || (typeof err.message === 'string' && err.message.includes('Duplicate column')))
+        (err.code === "ER_DUP_FIELDNAME" ||
+          (typeof err.message === "string" && err.message.includes("Duplicate column")))
       )
     ) {
       throw err;
@@ -214,14 +215,14 @@ async function initSchema(pool) {
     "SHOW INDEX FROM products WHERE Key_name = 'idx_products_category'",
   );
   if ((categoryIndexRows?.length ?? 0) === 0) {
-    await pool.query('CREATE INDEX idx_products_category ON products(category)');
+    await pool.query("CREATE INDEX idx_products_category ON products(category)");
   }
 
   const [fulltextIndexRows] = await pool.query(
     "SHOW INDEX FROM products WHERE Key_name = 'idx_products_fulltext'",
   );
   if ((fulltextIndexRows?.length ?? 0) === 0) {
-    await pool.query('CREATE FULLTEXT INDEX idx_products_fulltext ON products(name, description)');
+    await pool.query("CREATE FULLTEXT INDEX idx_products_fulltext ON products(name, description)");
   }
 
   await pool.query(`CREATE TABLE IF NOT EXISTS cart_items (
@@ -253,7 +254,8 @@ async function initSchema(pool) {
     if (
       !(
         err &&
-        (err.code === 'ER_DUP_FIELDNAME' || (typeof err.message === 'string' && err.message.includes('Duplicate column')))
+        (err.code === "ER_DUP_FIELDNAME" ||
+          (typeof err.message === "string" && err.message.includes("Duplicate column")))
       )
     ) {
       throw err;
@@ -270,6 +272,17 @@ async function initSchema(pool) {
       FOREIGN KEY (productId) REFERENCES products(id) ON DELETE CASCADE
     )`);
 
+  // Inventory change log for auditing stock updates
+  await pool.query(`CREATE TABLE IF NOT EXISTS inventory_changes (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      productId VARCHAR(191) NOT NULL,
+      oldStock INT NOT NULL,
+      newStock INT NOT NULL,
+      note TEXT NULL,
+      createdAt DATETIME NOT NULL,
+      FOREIGN KEY (productId) REFERENCES products(id) ON DELETE CASCADE
+    )`);
+
   // Users table for authentication
   await pool.query(`CREATE TABLE IF NOT EXISTS users (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -282,21 +295,21 @@ async function initSchema(pool) {
 
   await ensureUsersSchemaCompatibility(pool);
 
-  const [categoryRows] = await pool.query('SELECT COUNT(*) AS count FROM categories');
+  const [categoryRows] = await pool.query("SELECT COUNT(*) AS count FROM categories");
   const categoryCount = Number(categoryRows[0]?.count ?? 0);
   if (categoryCount === 0) {
     await pool.query(
-      `INSERT INTO categories (slug, name) VALUES ${seedCategories.map(() => '(?, ?)').join(', ')}`,
+      `INSERT INTO categories (slug, name) VALUES ${seedCategories.map(() => "(?, ?)").join(", ")}`,
       seedCategories.flatMap((category) => [category.slug, category.name]),
     );
   }
 
-  const [productRows] = await pool.query('SELECT COUNT(*) AS count FROM products');
+  const [productRows] = await pool.query("SELECT COUNT(*) AS count FROM products");
   const productCount = Number(productRows[0]?.count ?? 0);
   if (productCount === 0) {
     await pool.query(
       `INSERT INTO products (id, name, category, price, stock, image, description, isNew, isFeatured)
-       VALUES ${seedProducts.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ')}`,
+       VALUES ${seedProducts.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}`,
       seedProducts.flatMap((product) => [
         product.id,
         product.name,
@@ -312,40 +325,41 @@ async function initSchema(pool) {
   }
 
   // Seed admin user if none exist
-  const [userRows] = await pool.query('SELECT COUNT(*) AS count FROM users');
+  const [userRows] = await pool.query("SELECT COUNT(*) AS count FROM users");
   const userCount = Number(userRows[0]?.count ?? 0);
   if (userCount === 0) {
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
     const hash = await bcrypt.hash(adminPassword, 10);
-    const legacyPassword = createHash('sha256').update(adminPassword).digest('hex');
-    await pool.query('INSERT INTO users (email, name, passwordHash, password, role) VALUES (?, ?, ?, ?, ?)', [
-      'admin@shopease.com',
-      'Store Admin',
-      hash,
-      legacyPassword,
-      'admin',
-    ]);
+    const legacyPassword = createHash("sha256").update(adminPassword).digest("hex");
+    await pool.query(
+      "INSERT INTO users (email, name, passwordHash, password, role) VALUES (?, ?, ?, ?, ?)",
+      ["admin@shopease.com", "Store Admin", hash, legacyPassword, "admin"],
+    );
   }
 }
 
 async function ensureUsersSchemaCompatibility(pool) {
-  const [columns] = await pool.query('SHOW COLUMNS FROM users');
+  const [columns] = await pool.query("SHOW COLUMNS FROM users");
   const columnNames = new Set(columns.map((column) => column.Field));
 
-  if (!columnNames.has('passwordHash')) {
-    await pool.query('ALTER TABLE users ADD COLUMN passwordHash TEXT NULL');
+  if (!columnNames.has("passwordHash")) {
+    await pool.query("ALTER TABLE users ADD COLUMN passwordHash TEXT NULL");
   }
 
-  if (!columnNames.has('password')) {
-    await pool.query('ALTER TABLE users ADD COLUMN password VARCHAR(191) NULL');
+  if (!columnNames.has("password")) {
+    await pool.query("ALTER TABLE users ADD COLUMN password VARCHAR(191) NULL");
   } else {
-    await pool.query('ALTER TABLE users MODIFY password VARCHAR(191) NULL');
+    await pool.query("ALTER TABLE users MODIFY password VARCHAR(191) NULL");
   }
 
-  if (!columnNames.has('createdAt')) {
-    await pool.query('ALTER TABLE users ADD COLUMN createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
+  if (!columnNames.has("createdAt")) {
+    await pool.query(
+      "ALTER TABLE users ADD COLUMN createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+    );
   } else {
-    await pool.query('ALTER TABLE users MODIFY createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
+    await pool.query(
+      "ALTER TABLE users MODIFY createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+    );
   }
 }
 
@@ -359,44 +373,47 @@ async function ensureInitialized() {
 }
 
 export async function getCategories() {
-  const cacheKey = 'categories';
+  const cacheKey = "categories";
   const cached = getCachedValue(cacheKey);
   if (cached) return cached;
 
   await ensureInitialized();
   const pool = await poolPromise;
-  const [rows] = await pool.query('SELECT slug, name FROM categories ORDER BY name');
+  const [rows] = await pool.query("SELECT slug, name FROM categories ORDER BY name");
   setCachedValue(cacheKey, rows);
   return rows;
 }
 
 export async function createCategory(name) {
   const trimmed = name.trim();
-  if (!trimmed) throw new Error('Category name is required.');
+  if (!trimmed) throw new Error("Category name is required.");
   const slug = slugify(trimmed);
-  if (!slug) throw new Error('Category name is invalid.');
+  if (!slug) throw new Error("Category name is invalid.");
 
   await ensureInitialized();
   const pool = await poolPromise;
-  const [existing] = await pool.query('SELECT slug FROM categories WHERE slug = ?', [slug]);
+  const [existing] = await pool.query("SELECT slug FROM categories WHERE slug = ?", [slug]);
   if (existing.length > 0) {
-    throw new Error('Category already exists.');
+    throw new Error("Category already exists.");
   }
 
-  await pool.query('INSERT INTO categories (slug, name) VALUES (?, ?)', [slug, trimmed]);
+  await pool.query("INSERT INTO categories (slug, name) VALUES (?, ?)", [slug, trimmed]);
   clearAllCache();
   return { slug, name: trimmed };
 }
 
 export async function updateCategory(slug, name) {
   const trimmed = name.trim();
-  if (!trimmed) throw new Error('Category name is required.');
+  if (!trimmed) throw new Error("Category name is required.");
 
   await ensureInitialized();
   const pool = await poolPromise;
-  const [result] = await pool.query('UPDATE categories SET name = ? WHERE slug = ?', [trimmed, slug]);
+  const [result] = await pool.query("UPDATE categories SET name = ? WHERE slug = ?", [
+    trimmed,
+    slug,
+  ]);
   if (result.affectedRows === 0) {
-    throw new Error('Category not found.');
+    throw new Error("Category not found.");
   }
   clearAllCache();
   return { slug, name: trimmed };
@@ -406,14 +423,14 @@ export async function deleteCategory(slug) {
   await ensureInitialized();
   const pool = await poolPromise;
   try {
-    const [result] = await pool.query('DELETE FROM categories WHERE slug = ?', [slug]);
+    const [result] = await pool.query("DELETE FROM categories WHERE slug = ?", [slug]);
     if (result.affectedRows === 0) {
-      throw new Error('Category not found.');
+      throw new Error("Category not found.");
     }
     clearAllCache();
   } catch (error) {
-    if (error.code === 'ER_ROW_IS_REFERENCED_2') {
-      throw new Error('Category is still in use by one or more products.');
+    if (error.code === "ER_ROW_IS_REFERENCED_2") {
+      throw new Error("Category is still in use by one or more products.");
     }
     throw error;
   }
@@ -422,37 +439,41 @@ export async function deleteCategory(slug) {
 export async function getCartItems(cartId) {
   await ensureInitialized();
   const pool = await poolPromise;
-  const [rows] = await pool.query('SELECT cartId, productId, qty FROM cart_items WHERE cartId = ?', [cartId]);
+  const [rows] = await pool.query(
+    "SELECT cartId, productId, qty FROM cart_items WHERE cartId = ?",
+    [cartId],
+  );
   return rows;
 }
 
-export async function createUser(email, name, password, role = 'customer') {
+export async function createUser(email, name, password, role = "customer") {
   const trimmedEmail = String(email).trim().toLowerCase();
   const trimmedName = String(name).trim();
-  if (!trimmedEmail || !trimmedName || !password) throw new Error('Email, name and password are required.');
+  if (!trimmedEmail || !trimmedName || !password)
+    throw new Error("Email, name and password are required.");
   await ensureInitialized();
   const pool = await poolPromise;
-  const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [trimmedEmail]);
-  if (existing.length > 0) throw new Error('An account with this email already exists');
+  const [existing] = await pool.query("SELECT id FROM users WHERE email = ?", [trimmedEmail]);
+  if (existing.length > 0) throw new Error("An account with this email already exists");
   const passwordHash = await bcrypt.hash(password, 10);
-  const legacyPassword = createHash('sha256').update(password).digest('hex');
-  const [result] = await pool.query('INSERT INTO users (email, name, passwordHash, password, role) VALUES (?, ?, ?, ?, ?)', [
-    trimmedEmail,
-    trimmedName,
-    passwordHash,
-    legacyPassword,
-    role,
-  ]);
+  const legacyPassword = createHash("sha256").update(password).digest("hex");
+  const [result] = await pool.query(
+    "INSERT INTO users (email, name, passwordHash, password, role) VALUES (?, ?, ?, ?, ?)",
+    [trimmedEmail, trimmedName, passwordHash, legacyPassword, role],
+  );
   return { id: String(result.insertId), email: trimmedEmail, name: trimmedName, role };
 }
 
 export async function authenticateUser(email, password) {
   const trimmedEmail = String(email).trim().toLowerCase();
-  if (!trimmedEmail || !password) throw new Error('Email and password are required.');
+  if (!trimmedEmail || !password) throw new Error("Email and password are required.");
   await ensureInitialized();
   const pool = await poolPromise;
-  const [rows] = await pool.query('SELECT id, email, name, passwordHash, password, role FROM users WHERE email = ?', [trimmedEmail]);
-  if (rows.length === 0) throw new Error('Invalid email or password');
+  const [rows] = await pool.query(
+    "SELECT id, email, name, passwordHash, password, role FROM users WHERE email = ?",
+    [trimmedEmail],
+  );
+  if (rows.length === 0) throw new Error("Invalid email or password");
   const user = rows[0];
   let ok = false;
   if (user.passwordHash) {
@@ -460,25 +481,28 @@ export async function authenticateUser(email, password) {
   }
 
   if (!ok && user.password) {
-    ok = createHash('sha256').update(password).digest('hex') === user.password;
+    ok = createHash("sha256").update(password).digest("hex") === user.password;
     if (ok) {
       const passwordHash = await bcrypt.hash(password, 10);
-      await pool.query('UPDATE users SET passwordHash = ? WHERE email = ?', [passwordHash, trimmedEmail]);
+      await pool.query("UPDATE users SET passwordHash = ? WHERE email = ?", [
+        passwordHash,
+        trimmedEmail,
+      ]);
     }
   }
-  if (!ok) throw new Error('Invalid email or password');
+  if (!ok) throw new Error("Invalid email or password");
   return { id: String(user.id), email: user.email, name: user.name, role: user.role };
 }
 
 export async function setCartItems(cartId, items) {
   await ensureInitialized();
   const pool = await poolPromise;
-  await pool.query('DELETE FROM cart_items WHERE cartId = ?', [cartId]);
+  await pool.query("DELETE FROM cart_items WHERE cartId = ?", [cartId]);
   if (items.length === 0) return;
 
   const values = items.flatMap((item) => [cartId, item.productId, item.qty]);
   await pool.query(
-    `INSERT INTO cart_items (cartId, productId, qty) VALUES ${items.map(() => '(?, ?, ?)').join(', ')}`,
+    `INSERT INTO cart_items (cartId, productId, qty) VALUES ${items.map(() => "(?, ?, ?)").join(", ")}`,
     values,
   );
 }
@@ -486,11 +510,11 @@ export async function setCartItems(cartId, items) {
 export async function clearCartItems(cartId) {
   await ensureInitialized();
   const pool = await poolPromise;
-  await pool.query('DELETE FROM cart_items WHERE cartId = ?', [cartId]);
+  await pool.query("DELETE FROM cart_items WHERE cartId = ?", [cartId]);
 }
 
 export async function getProducts(category, q, limit) {
-  const cacheKey = `products:${category ?? ''}:${q ?? ''}:${limit ?? ''}`;
+  const cacheKey = `products:${category ?? ""}:${q ?? ""}:${limit ?? ""}`;
   const cached = getCachedValue(cacheKey);
   if (cached) return cached;
 
@@ -501,7 +525,7 @@ export async function getProducts(category, q, limit) {
   const params = [];
 
   if (category) {
-    conditions.push('category = ?');
+    conditions.push("category = ?");
     params.push(category);
   }
 
@@ -509,23 +533,23 @@ export async function getProducts(category, q, limit) {
     const search = q.trim();
     const fulltextQuery = search
       .split(/\s+/)
-      .map((term) => term.replace(/[^\w]+/g, ''))
+      .map((term) => term.replace(/[^\w]+/g, ""))
       .filter(Boolean)
       .map((term) => `+${term}*`)
-      .join(' ');
+      .join(" ");
 
     if (fulltextQuery) {
-      conditions.push('MATCH(name, description) AGAINST(? IN BOOLEAN MODE)');
+      conditions.push("MATCH(name, description) AGAINST(? IN BOOLEAN MODE)");
       params.push(fulltextQuery);
     } else {
-      conditions.push('(LOWER(name) LIKE ? OR LOWER(description) LIKE ?)');
+      conditions.push("(LOWER(name) LIKE ? OR LOWER(description) LIKE ?)");
       const searchTerm = `%${search.toLowerCase()}%`;
       params.push(searchTerm, searchTerm);
     }
   }
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const query = `SELECT * FROM products ${whereClause} ORDER BY name${limit ? ' LIMIT ?' : ''}`;
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const query = `SELECT * FROM products ${whereClause} ORDER BY name${limit ? " LIMIT ?" : ""}`;
   if (limit) {
     params.push(limit);
   }
@@ -548,7 +572,7 @@ export async function getProductById(id) {
 
   await ensureInitialized();
   const pool = await poolPromise;
-  const [rows] = await pool.query('SELECT * FROM products WHERE id = ?', [id]);
+  const [rows] = await pool.query("SELECT * FROM products WHERE id = ?", [id]);
   const product = rows[0];
   if (!product) return undefined;
 
@@ -565,14 +589,17 @@ export async function getProductsByIds(ids) {
   if (ids.length === 0) return [];
 
   const normalizedIds = Array.from(new Set(ids));
-  const cacheKey = `productsByIds:${normalizedIds.join(',')}`;
+  const cacheKey = `productsByIds:${normalizedIds.join(",")}`;
   const cached = getCachedValue(cacheKey);
   if (cached) return cached;
 
   await ensureInitialized();
   const pool = await poolPromise;
-  const placeholders = normalizedIds.map(() => '?').join(', ');
-  const [rows] = await pool.query(`SELECT * FROM products WHERE id IN (${placeholders})`, normalizedIds);
+  const placeholders = normalizedIds.map(() => "?").join(", ");
+  const [rows] = await pool.query(
+    `SELECT * FROM products WHERE id IN (${placeholders})`,
+    normalizedIds,
+  );
   const products = rows.map((product) => ({
     ...product,
     isNew: Boolean(product.isNew),
@@ -583,7 +610,7 @@ export async function getProductsByIds(ids) {
 }
 
 export async function getHomePageProducts() {
-  const cacheKey = 'homePage';
+  const cacheKey = "homePage";
   const cached = getCachedValue(cacheKey);
   if (cached) return cached;
 
@@ -591,10 +618,10 @@ export async function getHomePageProducts() {
   const pool = await poolPromise;
 
   const [featuredRows, newRows, categoryStatsRows, categoryNames] = await Promise.all([
-    pool.query('SELECT * FROM products WHERE isFeatured = 1 ORDER BY name LIMIT 8'),
-    pool.query('SELECT * FROM products WHERE isNew = 1 ORDER BY name LIMIT 8'),
-    pool.query('SELECT category AS slug, COUNT(*) AS count FROM products GROUP BY category'),
-    pool.query('SELECT slug, name FROM categories'),
+    pool.query("SELECT * FROM products WHERE isFeatured = 1 ORDER BY name LIMIT 8"),
+    pool.query("SELECT * FROM products WHERE isNew = 1 ORDER BY name LIMIT 8"),
+    pool.query("SELECT category AS slug, COUNT(*) AS count FROM products GROUP BY category"),
+    pool.query("SELECT slug, name FROM categories"),
   ]);
 
   const featured = featuredRows[0].map((product) => ({
@@ -632,22 +659,22 @@ export async function getHomePageProducts() {
 }
 
 export async function getRelatedProducts(category, excludeId, limit = 4) {
-  const cacheKey = `related:${category}:${excludeId ?? ''}:${limit}`;
+  const cacheKey = `related:${category}:${excludeId ?? ""}:${limit}`;
   const cached = getCachedValue(cacheKey);
   if (cached) return cached;
 
   await ensureInitialized();
   const pool = await poolPromise;
   const params = [category];
-  const whereClause = ['category = ?'];
+  const whereClause = ["category = ?"];
   if (excludeId) {
-    whereClause.push('id != ?');
+    whereClause.push("id != ?");
     params.push(excludeId);
   }
   params.push(limit);
 
   const [rows] = await pool.query(
-    `SELECT * FROM products WHERE ${whereClause.join(' AND ')} ORDER BY name LIMIT ?`,
+    `SELECT * FROM products WHERE ${whereClause.join(" AND ")} ORDER BY name LIMIT ?`,
     params,
   );
   const results = rows.map((product) => ({
@@ -657,6 +684,25 @@ export async function getRelatedProducts(category, excludeId, limit = 4) {
   }));
   setCachedValue(cacheKey, results);
   return results;
+}
+
+export async function addInventoryChange(productId, oldStock, newStock, note = null) {
+  await ensureInitialized();
+  const pool = await poolPromise;
+  await pool.query(
+    `INSERT INTO inventory_changes (productId, oldStock, newStock, note, createdAt) VALUES (?, ?, ?, ?, ?)`,
+    [productId, oldStock, newStock, note, new Date()],
+  );
+}
+
+export async function getInventoryHistory(productId, limit = 20) {
+  await ensureInitialized();
+  const pool = await poolPromise;
+  const [rows] = await pool.query(
+    `SELECT id, productId, oldStock, newStock, note, createdAt FROM inventory_changes WHERE productId = ? ORDER BY createdAt DESC LIMIT ?`,
+    [productId, Number(limit)],
+  );
+  return rows[0] ? rows : [];
 }
 
 export async function createProduct(product) {
@@ -677,6 +723,12 @@ export async function createProduct(product) {
       product.isFeatured ? 1 : 0,
     ],
   );
+  // Log initial stock
+  try {
+    await addInventoryChange(product.id, 0, Number(product.stock || 0), "initial stock");
+  } catch (err) {
+    // non-fatal
+  }
   clearAllCache();
   return product;
 }
@@ -684,6 +736,12 @@ export async function createProduct(product) {
 export async function updateProduct(product) {
   await ensureInitialized();
   const pool = await poolPromise;
+
+  // read current stock to log changes
+  const [currentRows] = await pool.query("SELECT stock FROM products WHERE id = ?", [product.id]);
+  const currentStock =
+    currentRows[0] && typeof currentRows[0].stock === "number" ? currentRows[0].stock : 0;
+
   const [result] = await pool.query(
     `UPDATE products SET name = ?, category = ?, price = ?, stock = ?, image = ?, description = ?, isNew = ?, isFeatured = ?
      WHERE id = ?`,
@@ -700,8 +758,22 @@ export async function updateProduct(product) {
     ],
   );
   if (result.affectedRows === 0) {
-    throw new Error('Product not found.');
+    throw new Error("Product not found.");
   }
+
+  if (Number(currentStock) !== Number(product.stock)) {
+    try {
+      await addInventoryChange(
+        product.id,
+        Number(currentStock),
+        Number(product.stock),
+        "admin update",
+      );
+    } catch (err) {
+      // non-fatal
+    }
+  }
+
   clearAllCache();
   return product;
 }
@@ -709,9 +781,9 @@ export async function updateProduct(product) {
 export async function deleteProduct(id) {
   await ensureInitialized();
   const pool = await poolPromise;
-  const [result] = await pool.query('DELETE FROM products WHERE id = ?', [id]);
+  const [result] = await pool.query("DELETE FROM products WHERE id = ?", [id]);
   if (result.affectedRows === 0) {
-    throw new Error('Product not found.');
+    throw new Error("Product not found.");
   }
   clearAllCache();
 }
@@ -719,15 +791,15 @@ export async function deleteProduct(id) {
 export async function resetStore() {
   await ensureInitialized();
   const pool = await poolPromise;
-  await pool.query('DELETE FROM order_items');
-  await pool.query('DELETE FROM orders');
-  await pool.query('DELETE FROM cart_items');
-  await pool.query('DELETE FROM products');
-  await pool.query('DELETE FROM categories');
+  await pool.query("DELETE FROM order_items");
+  await pool.query("DELETE FROM orders");
+  await pool.query("DELETE FROM cart_items");
+  await pool.query("DELETE FROM products");
+  await pool.query("DELETE FROM categories");
 
   if (seedCategories.length > 0) {
     await pool.query(
-      `INSERT INTO categories (slug, name) VALUES ${seedCategories.map(() => '(?, ?)').join(', ')}`,
+      `INSERT INTO categories (slug, name) VALUES ${seedCategories.map(() => "(?, ?)").join(", ")}`,
       seedCategories.flatMap((category) => [category.slug, category.name]),
     );
   }
@@ -735,7 +807,7 @@ export async function resetStore() {
   if (seedProducts.length > 0) {
     await pool.query(
       `INSERT INTO products (id, name, category, price, stock, image, description, isNew, isFeatured)
-       VALUES ${seedProducts.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?)').join(', ')}`,
+       VALUES ${seedProducts.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}`,
       seedProducts.flatMap((product) => [
         product.id,
         product.name,
@@ -762,16 +834,18 @@ export async function createOrder(order) {
 
     for (const item of order.items) {
       if (!Number.isInteger(item.qty) || item.qty <= 0) {
-        throw new Error('Item quantity must be a positive integer.');
+        throw new Error("Item quantity must be a positive integer.");
       }
 
       const [stockResult] = await connection.query(
-        'UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?',
+        "UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?",
         [item.qty, item.productId, item.qty],
       );
 
       if (stockResult.affectedRows === 0) {
-        const [rows] = await connection.query('SELECT name, stock FROM products WHERE id = ?', [item.productId]);
+        const [rows] = await connection.query("SELECT name, stock FROM products WHERE id = ?", [
+          item.productId,
+        ]);
         const product = rows[0];
         const name = product?.name ?? item.productId;
         const available = product?.stock ?? 0;
@@ -789,19 +863,24 @@ export async function createOrder(order) {
         order.email,
         order.address,
         order.payment,
-        order.status ?? 'pending',
+        order.status ?? "pending",
         order.subtotal,
         order.shipping,
         order.total,
-        new Date().toISOString().slice(0, 19).replace('T', ' '),
+        new Date().toISOString().slice(0, 19).replace("T", " "),
       ],
     );
 
     const orderId = result.insertId;
-    const values = order.items.flatMap((item) => [orderId, item.productId, item.qty, item.lineTotal]);
+    const values = order.items.flatMap((item) => [
+      orderId,
+      item.productId,
+      item.qty,
+      item.lineTotal,
+    ]);
     await connection.query(
       `INSERT INTO order_items (orderId, productId, qty, lineTotal)
-       VALUES ${order.items.map(() => '(?, ?, ?, ?)').join(', ')}`,
+       VALUES ${order.items.map(() => "(?, ?, ?, ?)").join(", ")}`,
       values,
     );
 
@@ -819,21 +898,21 @@ export async function createOrder(order) {
 export async function getOrderByOrderNumber(orderNumber) {
   await ensureInitialized();
   const pool = await poolPromise;
-  const [rows] = await pool.query('SELECT * FROM orders WHERE orderNumber = ?', [orderNumber]);
+  const [rows] = await pool.query("SELECT * FROM orders WHERE orderNumber = ?", [orderNumber]);
   return rows[0];
 }
 
 export async function getOrders() {
   await ensureInitialized();
   const pool = await poolPromise;
-  const [rows] = await pool.query('SELECT * FROM orders ORDER BY createdAt DESC');
+  const [rows] = await pool.query("SELECT * FROM orders ORDER BY createdAt DESC");
   return rows;
 }
 
 export async function getOrderDetails(id) {
   await ensureInitialized();
   const pool = await poolPromise;
-  const [orderRows] = await pool.query('SELECT * FROM orders WHERE id = ?', [id]);
+  const [orderRows] = await pool.query("SELECT * FROM orders WHERE id = ?", [id]);
   const order = orderRows[0];
   if (!order) return undefined;
 
@@ -859,9 +938,9 @@ export async function getOrderDetails(id) {
 export async function updateOrderStatus(id, status) {
   await ensureInitialized();
   const pool = await poolPromise;
-  const [result] = await pool.query('UPDATE orders SET status = ? WHERE id = ?', [status, id]);
+  const [result] = await pool.query("UPDATE orders SET status = ? WHERE id = ?", [status, id]);
   if (result.affectedRows === 0) {
-    throw new Error('Order not found.');
+    throw new Error("Order not found.");
   }
   clearAllCache();
   return getOrderDetails(id);
@@ -871,7 +950,7 @@ function slugify(str) {
   return str
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s_]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }

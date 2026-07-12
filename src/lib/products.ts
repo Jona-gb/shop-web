@@ -50,37 +50,10 @@ export type OrderDetails = OrderRecord & {
   items: OrderDetailItem[];
 };
 
-export const seedCategories: Category[] = [
-  { slug: "electronics", name: "Electronics" },
-  { slug: "fashion", name: "Fashion" },
-  { slug: "home", name: "Home & Living" },
-  { slug: "beauty", name: "Beauty" },
-  { slug: "sports", name: "Sports & Outdoors" },
-  { slug: "books", name: "Books" },
-];
 
-const img = (id: string) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=900&q=80`;
 
-export const seedProducts: Product[] = [
-  { id: "p1", name: "Wireless Headphones", category: "electronics", price: 129, stock: 12, image: img("photo-1505740420928-5e560c06d30e"), description: "Over-ear Bluetooth headphones with active noise cancellation and 30-hour battery life.", isFeatured: true, isNew: true },
-  { id: "p2", name: "Smart Watch Series 5", category: "electronics", price: 249, stock: 8, image: img("photo-1546868871-7041f2a55e12"), description: "Fitness tracking, heart-rate monitoring, and notifications on a crisp AMOLED display.", isFeatured: true },
-  { id: "p3", name: "Classic Cotton Tee", category: "fashion", price: 28, stock: 24, image: img("photo-1521572163474-6864f9cf17ab"), description: "Soft 100% organic cotton t-shirt with a relaxed everyday fit.", isNew: true },
-  { id: "p4", name: "Canvas Sneakers", category: "fashion", price: 65, stock: 14, image: img("photo-1542291026-7eec264c27ff"), description: "Lightweight low-top sneakers with cushioned insole and rubber sole.", isFeatured: true },
-  { id: "p5", name: "Ceramic Mug Set", category: "home", price: 32, stock: 20, image: img("photo-1514228742587-6b1558fcca3d"), description: "Set of four handcrafted stoneware mugs, microwave and dishwasher safe." },
-  { id: "p6", name: "Linen Throw Pillow", category: "home", price: 45, stock: 10, image: img("photo-1592078615290-033ee584e267"), description: "Stonewashed linen pillow cover with hidden zip. Insert included.", isNew: true },
-  { id: "p7", name: "Hydrating Face Serum", category: "beauty", price: 38, stock: 16, image: img("photo-1620916566398-39f1143ab7be"), description: "Lightweight hyaluronic acid serum for a plump, dewy glow.", isFeatured: true },
-  { id: "p8", name: "Yoga Mat Pro", category: "sports", price: 58, stock: 7, image: img("photo-1599447421416-3414500d18a5"), description: "6mm non-slip TPE mat with carrying strap. Perfect for yoga, pilates and stretching." },
-  { id: "p9", name: "Stainless Water Bottle", category: "sports", price: 24, stock: 30, image: img("photo-1602143407151-7111542de6e8"), description: "Double-walled insulated bottle keeps drinks cold for 24h, hot for 12h." },
-  { id: "p10", name: "The Modern Reader", category: "books", price: 18, stock: 18, image: img("photo-1544947950-fa07a98d237f"), description: "A curated anthology of contemporary short fiction.", isNew: true },
-  { id: "p11", name: "Minimalist Backpack", category: "fashion", price: 89, stock: 11, image: img("photo-1553062407-98eeb64c6a62"), description: "Water-resistant 20L backpack with padded laptop sleeve.", isFeatured: true },
-  { id: "p12", name: "Aroma Diffuser", category: "home", price: 54, stock: 13, image: img("photo-1602928298849-325cec8771c0"), description: "Ultrasonic essential oil diffuser with ambient LED lighting." },
-];
 
-export function categoryName(slug: string, list?: Category[]): string {
-  const cats = list ?? seedCategories;
-  return cats.find((c) => c.slug === slug)?.name ?? slug;
-}
+
 
 export function newId(prefix = "p") {
   return prefix + Math.random().toString(36).slice(2, 9);
@@ -90,10 +63,18 @@ export function slugify(s: string) {
   return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
+export function categoryName(slug: string, categories?: Category[]): string {
+  if (categories) {
+    const category = categories.find((c) => c.slug === slug);
+    if (category) return category.name;
+  }
+  return slug.charAt(0).toUpperCase() + slug.slice(1).replace(/-/g, " ");
+}
+
 function fetchApi<T>(path: string): Promise<T> {
   if (import.meta.env.SSR) { throw new Error("API fetch is only available in the browser"); }
 
-  return fetch(path).then((res) => {
+  return fetch(path, { cache: "no-store" }).then((res) => {
     if (!res.ok) {
       throw new Error(`API request failed: ${res.status}`);
     }
@@ -157,11 +138,12 @@ export async function fetchHomeProducts(): Promise<HomePageData> {
 export async function fetchAdminDashboard(): Promise<AdminDashboardData> {
   if (import.meta.env.SSR) {
     const { getProducts, getCategories, getOrders } = await import("@/lib/db");
-    const [products, categories, orders] = await Promise.all([
+    const [products, categories, rawOrders] = await Promise.all([
       getProducts(),
       getCategories(),
       getOrders(),
     ]);
+    const orders = rawOrders as unknown as OrderRecord[];
     return { products, categories, orders };
   }
 
@@ -174,7 +156,7 @@ export async function fetchProduct(id: string): Promise<Product | null> {
     return (await getProductById(id)) ?? null;
   }
 
-  return fetch(`/api/products/${encodeURIComponent(id)}`).then(async (res) => {
+  return fetch(`/api/products/${encodeURIComponent(id)}`, { cache: "no-store" }).then(async (res) => {
     if (res.status === 404) return null;
     if (!res.ok) throw new Error(`Unable to load product ${id}`);
     return (await res.json()) as Product;
@@ -259,7 +241,8 @@ export async function fetchRelatedProducts(category: string, excludeId: string, 
 export async function fetchOrders(): Promise<OrderRecord[]> {
   if (import.meta.env.SSR) {
     const { getOrders } = await import("@/lib/db");
-    return getOrders();
+    const rawOrders = await getOrders();
+    return rawOrders as unknown as OrderRecord[];
   }
 
   return fetchApi<OrderRecord[]>("/api/admin/orders");
@@ -339,8 +322,8 @@ export function useApiProducts(category?: string, q?: string, limit?: number) {
   return useQuery({
     queryKey: ["products", category ?? "", q ?? "", limit ?? 0],
     queryFn: () => fetchProducts(category, q, limit),
-    staleTime: 1000 * 60 * 10,
-    gcTime: 1000 * 60 * 30,
+    staleTime: 1000 * 30,
+    gcTime: 1000 * 60 * 5,
     placeholderData: [] as Product[],
     enabled: true,
   });
@@ -350,7 +333,7 @@ export function useApiProductsByIds(ids: string[]) {
   return useQuery({
     queryKey: ["products-by-ids", ...ids],
     queryFn: () => fetchProductsByIds(ids),
-    staleTime: 1000 * 60 * 2,
+    staleTime: 1000 * 15,
     enabled: ids.length > 0,
   });
 }
@@ -359,8 +342,8 @@ export function useApiHomeProducts() {
   return useQuery({
     queryKey: ["home-page-data"],
     queryFn: fetchHomeProducts,
-    staleTime: 1000 * 60 * 30,
-    gcTime: 1000 * 60 * 60,
+    staleTime: 1000 * 30,
+    gcTime: 1000 * 60 * 5,
     enabled: true,
   });
 }

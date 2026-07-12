@@ -38,7 +38,7 @@ function json(data: unknown, status = 200, headers: Record<string, string> = {})
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "cache-control": "public, max-age=600",
+      "cache-control": "no-store",
       ...headers,
     },
   });

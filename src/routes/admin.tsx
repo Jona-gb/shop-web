@@ -1783,7 +1783,7 @@ function ProductForm({
               {categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
             </select>
           </FieldRow>
-          <FieldRow label="Price (USD)">
+          <FieldRow label="Price (GH₵)">
             <input type="number" min={0} step={1} value={p.price} onChange={(e) => update("price", Number(e.target.value))} className={inputCls} />
           </FieldRow>
         </div>

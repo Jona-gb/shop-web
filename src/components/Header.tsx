@@ -55,10 +55,10 @@ export function Header() {
         <div className="mx-auto flex h-8 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-4">
             <span>English</span>
-            <span className="inline-flex items-center gap-1">USD <ChevronDown className="h-3 w-3" /></span>
+            <span className="inline-flex items-center gap-1">GH₵ <ChevronDown className="h-3 w-3" /></span>
             <span className="inline-flex items-center gap-1.5 text-muted-foreground">
               <Sparkles className="h-3 w-3 text-primary" />
-              Free shipping on all orders over $100
+              Free shipping on all orders over GH₵10000
             </span>
           </div>
           <div className="flex items-center gap-5">

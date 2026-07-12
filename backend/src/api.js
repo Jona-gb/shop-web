@@ -22,7 +22,8 @@ import {
   getOrderByOrderNumber,
   createUser,
   authenticateUser,
-} from './db.js';
+  getInventoryHistory,
+} from "./db.js";
 
 // Checkout controller
 function createOrderNumber() {
@@ -41,22 +42,30 @@ function getOrderTotal(subtotal) {
 }
 
 const checkoutSchema = {
-  name: { required: true, type: 'string' },
-  email: { required: true, type: 'string' },
-  phone: { required: true, type: 'string' },
-  address: { required: true, type: 'string' },
-  payment: { required: true, type: 'string' },
-  items: { required: true, type: 'array' },
+  name: { required: true, type: "string" },
+  email: { required: true, type: "string" },
+  phone: { required: true, type: "string" },
+  address: { required: true, type: "string" },
+  payment: { required: true, type: "string" },
+  items: { required: true, type: "array" },
 };
 
-const orderStatuses = new Set(['pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled']);
+const orderStatuses = new Set([
+  "pending",
+  "paid",
+  "processing",
+  "shipped",
+  "delivered",
+  "cancelled",
+]);
 
 // Utility functions
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
-      'content-type': 'application/json; charset=utf-8',
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
       ...headers,
     },
   });
@@ -69,8 +78,8 @@ function badRequest(payload, headers = {}) {
 function parseCookies(cookieHeader) {
   const cookies = {};
   if (!cookieHeader) return cookies;
-  for (const cookie of cookieHeader.split(';')) {
-    const index = cookie.indexOf('=');
+  for (const cookie of cookieHeader.split(";")) {
+    const index = cookie.indexOf("=");
     if (index < 0) continue;
     const key = cookie.slice(0, index).trim();
     const value = cookie.slice(index + 1).trim();
@@ -80,14 +89,14 @@ function parseCookies(cookieHeader) {
 }
 
 function createCartId() {
-  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
 function getCartIdFromRequest(request) {
-  const cookies = parseCookies(request.headers.get('cookie'));
-  const existing = cookies['cart_id'];
+  const cookies = parseCookies(request.headers.get("cookie"));
+  const existing = cookies["cart_id"];
   if (existing) {
     return { cartId: existing };
   }
@@ -102,17 +111,21 @@ function getCartIdFromRequest(request) {
 async function parseRequestBody(request) {
   // Accept Express-style parsed body or a Fetch Request with .json()
   try {
-    console.log('parseRequestBody incoming:', {
-      hasBody: request && typeof request.body !== 'undefined',
+    console.log("parseRequestBody incoming:", {
+      hasBody: request && typeof request.body !== "undefined",
       bodyType: request && request.body ? typeof request.body : null,
-      hasJsonFn: request && request.body && typeof request.body.json === 'function',
-      hasTopJson: request && typeof request.json === 'function',
+      hasJsonFn: request && request.body && typeof request.body.json === "function",
+      hasTopJson: request && typeof request.json === "function",
     });
   } catch (e) {}
   try {
-    if (request && typeof request.body !== 'undefined') {
+    if (request && typeof request.body !== "undefined") {
       // If body looks like a wrapper with a json() helper, call it
-      if (request.body && typeof request.body === 'object' && typeof request.body.json === 'function') {
+      if (
+        request.body &&
+        typeof request.body === "object" &&
+        typeof request.body.json === "function"
+      ) {
         return await request.body.json();
       }
       return request.body;
@@ -120,214 +133,231 @@ async function parseRequestBody(request) {
   } catch {}
 
   try {
-    if (request && typeof request.json === 'function') return await request.json();
+    if (request && typeof request.json === "function") return await request.json();
   } catch {}
 
   return null;
 }
 
-
 // Main API handler
 export async function handleApiRequest(request) {
   const url = new URL(request.url);
-  const path = url.pathname.replace(/\/+$/, '');
+  const path = url.pathname.replace(/\/+$/, "");
 
   // Auth endpoints
-  if (path === '/api/auth/signup' && request.method === 'POST') {
+  if (path === "/api/auth/signup" && request.method === "POST") {
     const body = await parseRequestBody(request);
-    if (!body || typeof body.email !== 'string' || typeof body.name !== 'string' || typeof body.password !== 'string') {
-      return badRequest({ error: 'Email, name, and password are required.' });
+    if (
+      !body ||
+      typeof body.email !== "string" ||
+      typeof body.name !== "string" ||
+      typeof body.password !== "string"
+    ) {
+      return badRequest({ error: "Email, name, and password are required." });
     }
     if (body.password.length < 6) {
-      return badRequest({ error: 'Password must be at least 6 characters.' });
+      return badRequest({ error: "Password must be at least 6 characters." });
     }
     try {
-      const user = await createUser(body.email.toLowerCase().trim(), body.name.trim(), body.password);
+      const user = await createUser(
+        body.email.toLowerCase().trim(),
+        body.name.trim(),
+        body.password,
+      );
       return json(user, 201);
     } catch (err) {
-      return badRequest({ error: err instanceof Error ? err.message : 'Could not create account' });
+      return badRequest({ error: err instanceof Error ? err.message : "Could not create account" });
     }
   }
 
-  if (path === '/api/auth/login' && request.method === 'POST') {
+  if (path === "/api/auth/login" && request.method === "POST") {
     const body = await parseRequestBody(request);
-    if (!body || typeof body.email !== 'string' || typeof body.password !== 'string') {
-      return badRequest({ error: 'Email and password are required.' });
+    if (!body || typeof body.email !== "string" || typeof body.password !== "string") {
+      return badRequest({ error: "Email and password are required." });
     }
     try {
       const user = await authenticateUser(body.email.toLowerCase().trim(), body.password);
       return json(user);
     } catch (err) {
-      return badRequest({ error: err instanceof Error ? err.message : 'Could not sign in' });
+      return badRequest({ error: err instanceof Error ? err.message : "Could not sign in" });
     }
   }
 
-  if (path === '/api/categories' && request.method === 'GET') {
+  if (path === "/api/categories" && request.method === "GET") {
     return json(await getCategories());
   }
 
-  if (path === '/api/products' && request.method === 'GET') {
-    const limitValue = url.searchParams.get('limit');
+  if (path === "/api/products" && request.method === "GET") {
+    const limitValue = url.searchParams.get("limit");
     return json(
       await getProducts(
-        url.searchParams.get('category') ?? undefined,
-        url.searchParams.get('q') ?? undefined,
+        url.searchParams.get("category") ?? undefined,
+        url.searchParams.get("q") ?? undefined,
         limitValue ? Number(limitValue) : undefined,
       ),
     );
   }
 
-  if (path === '/api/admin/dashboard' && request.method === 'GET') {
+  if (path === "/api/admin/dashboard" && request.method === "GET") {
     const [products, categories, orders] = await Promise.all([
       getProducts(),
       getCategories(),
       getOrders(),
     ]);
-    return json({ products, categories, orders }, 200, { 'cache-control': 'no-store' });
+    return json({ products, categories, orders }, 200, { "cache-control": "no-store" });
   }
 
-  if (path === '/api/products/home' && request.method === 'GET') {
+  if (path === "/api/products/home" && request.method === "GET") {
     return json(await getHomePageProducts());
   }
 
-  if (path === '/api/products/ids' && request.method === 'GET') {
-    const ids = url.searchParams.getAll('id');
+  if (path === "/api/products/ids" && request.method === "GET") {
+    const ids = url.searchParams.getAll("id");
     return json(await getProductsByIds(ids));
   }
 
-  if (path === '/api/products/related' && request.method === 'GET') {
-    const category = url.searchParams.get('category');
-    const excludeId = url.searchParams.get('excludeId') ?? undefined;
-    const limit = Number(url.searchParams.get('limit') ?? 4);
+  if (path === "/api/products/related" && request.method === "GET") {
+    const category = url.searchParams.get("category");
+    const excludeId = url.searchParams.get("excludeId") ?? undefined;
+    const limit = Number(url.searchParams.get("limit") ?? 4);
     if (!category) {
-      return badRequest({ error: 'Category is required.' });
+      return badRequest({ error: "Category is required." });
     }
     return json(await getRelatedProducts(category, excludeId, limit));
   }
-
-  if (path.startsWith('/api/products/') && request.method === 'GET') {
-    const id = path.replace('/api/products/', '');
+  if (path.startsWith("/api/products/") && path.endsWith("/history") && request.method === "GET") {
+    const id = path.replace("/api/products/", "").replace(/\/history$/, "");
+    const limit = Number(url.searchParams.get("limit") ?? 20);
+    const history = await getInventoryHistory(id, limit);
+    return json(history);
+  }
+  if (path.startsWith("/api/products/") && request.method === "GET") {
+    const id = path.replace("/api/products/", "");
     const product = await getProductById(id);
-    if (!product) return json({ error: 'Product not found' }, 404);
+    if (!product) return json({ error: "Product not found" }, 404);
     return json(product);
   }
 
-  if (path === '/api/admin/categories' && request.method === 'POST') {
+  if (path === "/api/admin/categories" && request.method === "POST") {
     const body = await parseRequestBody(request);
-    if (!body || typeof body.name !== 'string') {
-      return badRequest({ error: 'Category name is required.' });
+    if (!body || typeof body.name !== "string") {
+      return badRequest({ error: "Category name is required." });
     }
     const category = await createCategory(body.name);
     return json(category, 201);
   }
 
-  if (path.startsWith('/api/admin/categories/') && request.method === 'PUT') {
-    const slug = path.replace('/api/admin/categories/', '');
+  if (path.startsWith("/api/admin/categories/") && request.method === "PUT") {
+    const slug = path.replace("/api/admin/categories/", "");
     const body = await parseRequestBody(request);
-    if (!body || typeof body.name !== 'string') {
-      return badRequest({ error: 'Category name is required.' });
+    if (!body || typeof body.name !== "string") {
+      return badRequest({ error: "Category name is required." });
     }
     const category = await updateCategory(slug, body.name);
     return json(category);
   }
 
-  if (path.startsWith('/api/admin/categories/') && request.method === 'DELETE') {
-    const slug = path.replace('/api/admin/categories/', '');
+  if (path.startsWith("/api/admin/categories/") && request.method === "DELETE") {
+    const slug = path.replace("/api/admin/categories/", "");
     await deleteCategory(slug);
     return json({ success: true });
   }
 
-  if (path === '/api/admin/products' && request.method === 'POST') {
+  if (path === "/api/admin/products" && request.method === "POST") {
     const body = await parseRequestBody(request);
-    if (!body || typeof body.id !== 'string') {
-      return badRequest({ error: 'Product data is required.' });
+    if (!body || typeof body.id !== "string") {
+      return badRequest({ error: "Product data is required." });
     }
-    if (typeof body.stock !== 'number' || !Number.isInteger(body.stock) || body.stock < 0) {
-      return badRequest({ error: 'Product stock must be a non-negative integer.' });
+    if (typeof body.stock !== "number" || !Number.isInteger(body.stock) || body.stock < 0) {
+      return badRequest({ error: "Product stock must be a non-negative integer." });
     }
     const product = await createProduct(body);
     return json(product, 201);
   }
 
-  if (path.startsWith('/api/admin/products/') && request.method === 'PUT') {
-    const id = path.replace('/api/admin/products/', '');
+  if (path.startsWith("/api/admin/products/") && request.method === "PUT") {
+    const id = path.replace("/api/admin/products/", "");
     const body = await parseRequestBody(request);
-    if (!body || typeof body.id !== 'string') {
-      return badRequest({ error: 'Product data is required.' });
+    if (!body || typeof body.id !== "string") {
+      return badRequest({ error: "Product data is required." });
     }
-    if (typeof body.stock !== 'number' || !Number.isInteger(body.stock) || body.stock < 0) {
-      return badRequest({ error: 'Product stock must be a non-negative integer.' });
+    if (typeof body.stock !== "number" || !Number.isInteger(body.stock) || body.stock < 0) {
+      return badRequest({ error: "Product stock must be a non-negative integer." });
     }
     const product = await updateProduct({ ...body, id });
     return json(product);
   }
 
-  if (path.startsWith('/api/admin/products/') && request.method === 'DELETE') {
-    const id = path.replace('/api/admin/products/', '');
+  if (path.startsWith("/api/admin/products/") && request.method === "DELETE") {
+    const id = path.replace("/api/admin/products/", "");
     await deleteProduct(id);
     return json({ success: true });
   }
 
-  if (path === '/api/admin/reset' && request.method === 'POST') {
+  if (path === "/api/admin/reset" && request.method === "POST") {
     await resetStore();
     return json({ success: true });
   }
 
-  if (path === '/api/admin/orders' && request.method === 'GET') {
+  if (path === "/api/admin/orders" && request.method === "GET") {
     return json(await getOrders());
   }
 
-  if (path.startsWith('/api/admin/orders/') && request.method === 'GET') {
-    const id = Number(path.replace('/api/admin/orders/', ''));
+  if (path.startsWith("/api/admin/orders/") && request.method === "GET") {
+    const id = Number(path.replace("/api/admin/orders/", ""));
     if (!Number.isInteger(id) || id <= 0) {
-      return badRequest({ error: 'Valid order id is required.' });
+      return badRequest({ error: "Valid order id is required." });
     }
     const order = await getOrderDetails(id);
-    if (!order) return json({ error: 'Order not found' }, 404);
+    if (!order) return json({ error: "Order not found" }, 404);
     return json(order);
   }
 
-  if (path.startsWith('/api/admin/orders/') && path.endsWith('/status') && request.method === 'PUT') {
-    const id = Number(path.replace('/api/admin/orders/', '').replace('/status', ''));
+  if (
+    path.startsWith("/api/admin/orders/") &&
+    path.endsWith("/status") &&
+    request.method === "PUT"
+  ) {
+    const id = Number(path.replace("/api/admin/orders/", "").replace("/status", ""));
     const body = await parseRequestBody(request);
     if (!Number.isInteger(id) || id <= 0) {
-      return badRequest({ error: 'Valid order id is required.' });
+      return badRequest({ error: "Valid order id is required." });
     }
-    if (!body || typeof body.status !== 'string' || !orderStatuses.has(body.status)) {
-      return badRequest({ error: 'Valid order status is required.' });
+    if (!body || typeof body.status !== "string" || !orderStatuses.has(body.status)) {
+      return badRequest({ error: "Valid order status is required." });
     }
     const order = await updateOrderStatus(id, body.status);
-    return json(order, 200, { 'cache-control': 'no-store' });
+    return json(order, 200, { "cache-control": "no-store" });
   }
 
-  if (path === '/api/cart' && request.method === 'GET') {
+  if (path === "/api/cart" && request.method === "GET") {
     const { cartId, setCookie } = getCartIdFromRequest(request);
     const cartItems = await getCartItems(cartId);
     return json(
       { items: cartItems.map(({ productId, qty }) => ({ productId, qty })) },
       200,
-      setCookie ? { 'set-cookie': setCookie } : {},
+      setCookie ? { "set-cookie": setCookie } : {},
     );
   }
 
-  if (path === '/api/cart' && request.method === 'POST') {
+  if (path === "/api/cart" && request.method === "POST") {
     const { cartId, setCookie } = getCartIdFromRequest(request);
     const body = await parseRequestBody(request);
     if (!body || !Array.isArray(body.items)) {
       return badRequest(
-        { error: 'Cart items are required.' },
-        setCookie ? { 'set-cookie': setCookie } : undefined,
+        { error: "Cart items are required." },
+        setCookie ? { "set-cookie": setCookie } : undefined,
       );
     }
 
     const items = body.items.map((item) => {
       if (
-        typeof item !== 'object' ||
+        typeof item !== "object" ||
         item === null ||
-        typeof item.productId !== 'string' ||
-        typeof item.qty !== 'number'
+        typeof item.productId !== "string" ||
+        typeof item.qty !== "number"
       ) {
-        throw new Error('Invalid cart item data.');
+        throw new Error("Invalid cart item data.");
       }
       return {
         cartId,
@@ -337,22 +367,22 @@ export async function handleApiRequest(request) {
     });
 
     await setCartItems(cartId, items);
-    return json({ success: true }, 200, setCookie ? { 'set-cookie': setCookie } : {});
+    return json({ success: true }, 200, setCookie ? { "set-cookie": setCookie } : {});
   }
 
-  if (path === '/api/cart' && request.method === 'DELETE') {
+  if (path === "/api/cart" && request.method === "DELETE") {
     const { cartId, setCookie } = getCartIdFromRequest(request);
     await clearCartItems(cartId);
-    return json({ success: true }, 200, setCookie ? { 'set-cookie': setCookie } : {});
+    return json({ success: true }, 200, setCookie ? { "set-cookie": setCookie } : {});
   }
 
-  if (path === '/api/checkout' && request.method === 'POST') {
+  if (path === "/api/checkout" && request.method === "POST") {
     const { cartId, setCookie } = getCartIdFromRequest(request);
     const body = await parseRequestBody(request);
     if (!body) {
       return badRequest(
-        { error: 'Invalid JSON body' },
-        setCookie ? { 'set-cookie': setCookie } : undefined,
+        { error: "Invalid JSON body" },
+        setCookie ? { "set-cookie": setCookie } : undefined,
       );
     }
 
@@ -364,25 +394,25 @@ export async function handleApiRequest(request) {
     }
 
     if (Object.keys(errors).length > 0) {
-      return badRequest({ errors }, setCookie ? { 'set-cookie': setCookie } : undefined);
+      return badRequest({ errors }, setCookie ? { "set-cookie": setCookie } : undefined);
     }
 
     const items = Array.isArray(body.items) ? body.items : [];
     if (items.length === 0) {
       return badRequest(
-        { errors: { items: 'Cart items are required.' } },
-        setCookie ? { 'set-cookie': setCookie } : undefined,
+        { errors: { items: "Cart items are required." } },
+        setCookie ? { "set-cookie": setCookie } : undefined,
       );
     }
 
     const validatedItems = items.map((item) => {
       if (
-        typeof item !== 'object' ||
+        typeof item !== "object" ||
         item === null ||
-        typeof item.productId !== 'string' ||
-        typeof item.qty !== 'number'
+        typeof item.productId !== "string" ||
+        typeof item.qty !== "number"
       ) {
-        throw new Error('Invalid cart item data.');
+        throw new Error("Invalid cart item data.");
       }
       return {
         productId: String(item.productId),
@@ -399,7 +429,7 @@ export async function handleApiRequest(request) {
         throw new Error(`Product not found: ${item.productId}`);
       }
       if (!Number.isInteger(item.qty) || item.qty <= 0) {
-        throw new Error('Item quantity must be a positive integer.');
+        throw new Error("Item quantity must be a positive integer.");
       }
       if (product.stock <= 0) {
         throw new Error(`${product.name} is out of stock.`);
@@ -439,9 +469,9 @@ export async function handleApiRequest(request) {
     return json(
       { orderNumber, total, subtotal, shipping },
       200,
-      setCookie ? { 'set-cookie': setCookie } : {},
+      setCookie ? { "set-cookie": setCookie } : {},
     );
   }
 
-  return json({ error: 'API route not found' }, 404);
+  return json({ error: "API route not found" }, 404);
 }
